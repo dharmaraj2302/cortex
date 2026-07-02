@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cortex — Team Knowledge Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy: #16213E;
+    --navy-soft: #22335C;
+    --amber: #E8A33D;
+    --amber-soft: #FCEBD2;
+    --bg: #F6F7FB;
+    --card: #FFFFFF;
+    --line: #E4E7F0;
+    --text: #1C2333;
+    --text-mute: #6B7284;
+    --text-faint: #9AA0B4;
+    --green: #2FA876;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Inter', sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.brand,.nav-section-title{font-family:'Sora', sans-serif;}
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  button{font-family:inherit; cursor:pointer;}
+  input{font-family:inherit;}
+
+  /* ---------- Auth screen ---------- */
+  .auth-screen{
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(circle at 20% 20%, #1B2C52, var(--navy) 60%);
+  }
+  .auth-card{
+    background:var(--card);
+    border-radius:14px;
+    padding:38px 36px;
+    width:360px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .auth-brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:800; font-size:20px; margin-bottom:6px;
+  }
+  .auth-brand .mark{
+    width:28px; height:28px; border-radius:7px;
+    background:linear-gradient(135deg, var(--amber), #F4C77A);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:var(--navy); font-size:14px;
+  }
+  .auth-card p.sub{font-size:13px; color:var(--text-mute); margin-bottom:22px;}
+  .field{margin-bottom:14px;}
+  .field label{font-size:12px; font-weight:600; color:var(--text-mute); display:block; margin-bottom:5px;}
+  .field input{
+    width:100%; padding:10px 12px; border:1px solid var(--line);
+    border-radius:8px; font-size:13.5px; outline:none;
+  }
+  .field input:focus{border-color:var(--amber);}
+  .auth-btn{
+    width:100%; padding:11px; border:none; border-radius:8px;
+    background:var(--navy); color:#fff; font-weight:600; font-size:13.5px;
+    margin-top:6px;
+  }
+  .auth-btn:hover{background:var(--navy-soft);}
+  .auth-toggle{
+    text-align:center; font-size:12.5px; color:var(--text-mute);
+    margin-top:16px; cursor:pointer;
+  }
+  .auth-toggle b{color:var(--amber); font-weight:600;}
+  .auth-error{
+    background:#FDE9E9; color:#C0392B; font-size:12px;
+    padding:8px 10px; border-radius:7px; margin-bottom:12px; display:none;
+  }
+  .auth-loading{display:none; font-size:12px; color:var(--text-faint); margin-top:10px; text-align:center;}
+
+  /* ---------- Layout shell ---------- */
+  .app{
+    display:none;
+    grid-template-columns: 240px minmax(0,1fr) 300px;
+    grid-template-rows: 60px 1fr;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "sidebar main aside";
+    height:100vh;
+  }
+  .app.visible{display:grid;}
+
+  .topbar{
+    grid-area: topbar; background:var(--navy);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; color:#fff;
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:19px;}
+  .brand .mark{
+    width:26px; height:26px; border-radius:7px;
+    background:linear-gradient(135deg, var(--amber), #F4C77A);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; color:var(--navy); font-size:14px;
+  }
+  .search{flex:1; max-width:420px; margin:0 32px; position:relative;}
+  .search input{
+    width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14);
+    border-radius:8px; padding:8px 14px 8px 34px; color:#fff; font-size:13.5px;
+  }
+  .search input::placeholder{color:rgba(255,255,255,0.5);}
+  .search svg{position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:0.55;}
+  .topbar-right{display:flex; align-items:center; gap:14px;}
+  .signout-btn{
+    font-size:12px; color:rgba(255,255,255,0.6); background:none; border:none;
+  }
+  .signout-btn:hover{color:#fff;}
+  .avatar{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:600; font-size:13px; color:#fff; flex-shrink:0;
+  }
+
+  .sidebar{
+    grid-area: sidebar; background:var(--navy); color:#fff;
+    padding:20px 14px; overflow-y:auto; border-right:1px solid rgba(255,255,255,0.06);
+  }
+  .nav-section{margin-bottom:26px;}
+  .nav-section-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+    color:rgba(255,255,255,0.4); font-weight:600; padding:0 10px 8px;
+  }
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:8px 10px;
+    border-radius:7px; font-size:13.5px; color:rgba(255,255,255,0.82); margin-bottom:2px;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.06);}
+  .channel-pill{width:8px; height:8px; border-radius:2px; flex-shrink:0;}
+
+  .main{grid-area: main; overflow-y:auto; padding:28px 32px 60px;}
+  .feed-header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:22px;}
+  .feed-header h1{font-size:22px; font-weight:700;}
+  .feed-header p{color:var(--text-mute); font-size:13px; margin-top:3px;}
+
+  .composer{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:28px;
+  }
+  .composer-row{display:flex; gap:12px; align-items:center;}
+  .composer input[type=text]{
+    flex:1; border:none; outline:none; font-size:14px; color:var(--text);
+  }
+  .composer .actions{display:flex; gap:8px;}
+  .chip-btn{
+    font-size:12px; padding:6px 12px; border-radius:20px; border:1px solid var(--line);
+    background:var(--bg); color:var(--text-mute); font-weight:500; display:flex; align-items:center; gap:5px;
+  }
+  .chip-btn:hover{border-color:var(--amber); color:var(--navy);}
+  .chip-btn.active{border-color:var(--amber); background:var(--amber-soft); color:#B4740F;}
+  .composer-extra{display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--line);}
+  .composer-extra.visible{display:block;}
+  .composer-extra select, .composer-extra input{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px;
+    font-size:13px; margin-bottom:8px; outline:none;
+  }
+  .poll-input-row{display:flex; gap:6px; margin-bottom:6px;}
+  .poll-input-row input{margin-bottom:0;}
+  .add-option-btn{font-size:11.5px; color:var(--text-mute); background:none; border:none; padding:2px 0;}
+  .composer-submit{
+    background:var(--navy); color:#fff; border:none; padding:8px 16px; border-radius:7px;
+    font-size:12.5px; font-weight:600; margin-top:6px;
+  }
+
+  .feed{position:relative; padding-left:26px;}
+  .feed::before{
+    content:""; position:absolute; left:5px; top:8px; bottom:8px; width:2px;
+    background:linear-gradient(to bottom, var(--amber) 0%, var(--line) 12%, var(--line) 88%, transparent 100%);
+  }
+  .post{
+    position:relative; background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); padding:18px 20px; margin-bottom:18px;
+  }
+  .post::before{
+    content:""; position:absolute; left:-26px; top:22px; width:9px; height:9px;
+    border-radius:50%; background:var(--card); border:2px solid var(--amber);
+  }
+  .post-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .post-avatar{
+    width:32px; height:32px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:12px; font-weight:600; color:#fff; flex-shrink:0;
+  }
+  .post-meta{display:flex; flex-direction:column;}
+  .post-meta .name{font-size:13.5px; font-weight:600;}
+  .post-meta .sub{font-size:11.5px; color:var(--text-faint);}
+  .post-tag{margin-left:auto; font-size:10.5px; padding:3px 9px; border-radius:20px; font-weight:600;}
+  .tag-knowledge{background:#E8F0FE; color:#3457D5;}
+  .tag-poll{background:var(--amber-soft); color:#B4740F;}
+  .tag-announcement{background:#FDE9E9; color:#C0392B;}
+  .post h3{font-size:15.5px; margin-bottom:6px;}
+  .post p{font-size:13.5px; color:var(--text-mute); line-height:1.6;}
+
+  .poll-option{
+    position:relative; border:1px solid var(--line); border-radius:7px;
+    padding:9px 12px; margin-bottom:7px; font-size:13px; cursor:pointer; overflow:hidden;
+  }
+  .poll-option.voted{border-color:var(--amber);}
+  .poll-fill{position:absolute; left:0; top:0; bottom:0; background:var(--amber-soft); z-index:0;}
+  .poll-option .label{position:relative; z-index:1; display:flex; justify-content:space-between;}
+  .poll-option .pct{font-family:'IBM Plex Mono', monospace; color:var(--text-mute); font-size:12px;}
+  .poll-total{font-size:11.5px; color:var(--text-faint); margin-top:8px;}
+
+  .aside{grid-area: aside; background:var(--card); border-left:1px solid var(--line); display:flex; flex-direction:column; height:100%;}
+  .aside-header{padding:18px 18px 14px; border-bottom:1px solid var(--line);}
+  .aside-header h2{font-size:14.5px; font-weight:700;}
+  .aside-header p{font-size:11.5px; color:var(--text-faint); margin-top:2px;}
+  .channel-tabs{display:flex; gap:6px; padding:12px 18px 0; flex-wrap:wrap;}
+  .channel-tab{
+    font-size:12px; padding:6px 12px; border-radius:7px 7px 0 0; color:var(--text-mute);
+    font-weight:500; border-bottom:2px solid transparent;
+  }
+  .channel-tab.active{color:var(--navy); font-weight:700; border-bottom:2px solid var(--amber);}
+  .chat-stream{flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:14px;}
+  .chat-msg{display:flex; gap:9px;}
+  .chat-avatar{
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:600; color:#fff; flex-shrink:0;
+  }
+  .chat-body .name{font-size:12.5px; font-weight:600;}
+  .chat-body .time{font-size:10.5px; color:var(--text-faint); margin-left:6px; font-family:'IBM Plex Mono',monospace;}
+  .chat-body p{font-size:12.5px; color:var(--text-mute); margin-top:2px; line-height:1.5;}
+  .broadcast-badge{
+    display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:700;
+    color:#C0392B; background:#FDE9E9; padding:2px 8px; border-radius:20px; margin-bottom:5px;
+  }
+  .broadcast-badge .pulse{width:5px; height:5px; border-radius:50%; background:#C0392B; animation: pulse 1.6s infinite;}
+  @keyframes pulse{0%{opacity:1;} 50%{opacity:0.3;} 100%{opacity:1;}}
+  .chat-input{padding:14px 18px; border-top:1px solid var(--line); display:flex; gap:8px;}
+  .chat-input input{flex:1; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; outline:none;}
+  .chat-input input:focus{border-color:var(--amber);}
+  .broadcast-toggle{
+    display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-mute); padding:0 18px 10px;
+  }
+  .send-btn{
+    width:36px; height:36px; border-radius:8px; background:var(--navy); border:none;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .empty-state{font-size:12.5px; color:var(--text-faint); text-align:center; padding:30px 10px;}
+
+  ::-webkit-scrollbar{width:7px;}
+  ::-webkit-scrollbar-thumb{background:#D2D6E4; border-radius:10px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  @media (prefers-reduced-motion: reduce){.broadcast-badge .pulse{animation:none;}}
+
+  /* ---------- Gear / settings button ---------- */
+  .gear-btn{
+    width:34px; height:34px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,0.06); border:none;
+  }
+  .gear-btn:hover{background:rgba(255,255,255,0.12);}
+
+  /* ---------- Role gating notices ---------- */
+  .view-only-note{
+    font-size:12.5px; color:var(--text-faint); padding:10px 4px;
+  }
+  .locked-input{background:var(--bg); color:var(--text-faint);}
+
+  /* ---------- Admin modal ---------- */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(20,25,45,0.55);
+    z-index:100; align-items:center; justify-content:center;
+  }
+  .modal-overlay.visible{display:flex;}
+  .admin-modal{
+    background:var(--card); border-radius:14px; width:640px; max-width:92vw;
+    max-height:82vh; display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 24px 70px rgba(0,0,0,0.4);
+  }
+  .admin-modal-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 22px; border-bottom:1px solid var(--line);
+  }
+  .admin-modal-head h2{font-size:16px; font-weight:700;}
+  .close-modal-btn{
+    background:none; border:none; font-size:20px; color:var(--text-faint); line-height:1;
+  }
+  .admin-tabs{display:flex; gap:4px; padding:0 22px; border-bottom:1px solid var(--line);}
+  .admin-tab{
+    font-size:13px; padding:11px 6px; color:var(--text-mute); font-weight:500;
+    border-bottom:2px solid transparent; margin-right:18px;
+  }
+  .admin-tab.active{color:var(--navy); font-weight:700; border-bottom:2px solid var(--amber);}
+  .admin-tab-content{padding:20px 22px; overflow-y:auto; flex:1; display:none;}
+  .admin-tab-content.active{display:block;}
+
+  .member-row{
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);
+  }
+  .member-row .avatar{width:30px; height:30px; font-size:11.5px;}
+  .member-info{flex:1; min-width:0;}
+  .member-info .name{font-size:13px; font-weight:600;}
+  .member-info .email{font-size:11.5px; color:var(--text-faint);}
+  .role-select{
+    padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; color:var(--text);
+  }
+  .invite-note{
+    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    font-size:12px; color:var(--text-mute); margin-bottom:16px; line-height:1.5;
+  }
+
+  .admin-section-title{font-size:12px; font-weight:700; color:var(--text-mute); text-transform:uppercase; letter-spacing:0.04em; margin:18px 0 10px;}
+  .admin-section-title:first-child{margin-top:0;}
+  .manage-row{
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:13px;
+  }
+  .manage-row .swatch{width:9px; height:9px; border-radius:2px; flex-shrink:0;}
+  .manage-row .item-name{flex:1;}
+  .manage-row select{padding:5px 7px; border:1px solid var(--line); border-radius:6px; font-size:12px;}
+  .manage-row .delete-btn{
+    background:none; border:none; color:#C0392B; font-size:12px; padding:4px 6px;
+  }
+  .create-form{
+    display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;
+  }
+  .create-form input[type=text]{
+    flex:1; min-width:120px; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font-size:12.5px;
+  }
+  .create-form select, .create-form input[type=color]{
+    padding:8px; border:1px solid var(--line); border-radius:7px; font-size:12.5px;
+  }
+  .create-form button{
+    background:var(--navy); color:#fff; border:none; padding:8px 14px; border-radius:7px; font-size:12.5px; font-weight:600;
+  }
+
+  .settings-field{margin-bottom:16px;}
+  .settings-field label{font-size:12px; font-weight:600; color:var(--text-mute); display:block; margin-bottom:6px;}
+  .settings-field input[type=text]{
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px; font-size:13.5px;
+  }
+  .color-row{display:flex; gap:16px;}
+  .color-field{display:flex; align-items:center; gap:8px;}
+  .save-settings-btn{
+    background:var(--navy); color:#fff; border:none; padding:9px 18px; border-radius:8px;
+    font-size:13px; font-weight:600; margin-top:6px;
+  }
+  .save-toast{font-size:12px; color:var(--green); margin-left:12px; display:none;}
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-brand"><div class="mark">C</div>Cortex</div>
+    <p class="sub" id="authSub">Sign in to your team's knowledge hub</p>
+    <div class="auth-error" id="authError"></div>
+
+    <div class="field" id="nameField" style="display:none;">
+      <label>Full name</label>
+      <input type="text" id="fullNameInput" placeholder="Dharmaraj S">
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="emailInput" placeholder="you@motadata.com">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="passwordInput" placeholder="••••••••">
+    </div>
+    <button class="auth-btn" id="authSubmitBtn">Sign in</button>
+    <div class="auth-loading" id="authLoading">Working on it…</div>
+    <div class="auth-toggle" id="authToggle">New here? <b>Create an account</b></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app">
+
+  <div class="topbar">
+    <div class="brand"><div class="mark">C</div>Cortex</div>
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search posts, people, spaces…">
+    </div>
+    <div class="topbar-right">
+      <button class="signout-btn" id="signOutBtn">Sign out</button>
+      <button class="gear-btn" id="adminGearBtn" style="display:none;" title="Admin settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+      <div class="avatar" id="myAvatar" style="background:#5B6FE8;">?</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="nav-section">
+      <div class="nav-section-title">Home</div>
+      <div class="nav-item"><span class="channel-pill" style="background:var(--amber)"></span>All updates</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Knowledge Spaces</div>
+      <div id="spacesList"></div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Broadcast Channels</div>
+      <div id="channelsSidebarList"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="feed-header">
+      <div>
+        <h1>All updates</h1>
+        <p>Everything shared across your spaces, newest first</p>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-row">
+        <div class="avatar" id="composerAvatar" style="width:32px;height:32px;font-size:12px; background:#5B6FE8;">?</div>
+        <input type="text" id="postTitleInput" placeholder="Share an update, article, or ask your team a question…">
+        <div class="actions">
+          <button class="chip-btn" id="pollToggleBtn">📊 Poll</button>
+        </div>
+      </div>
+      <div class="composer-extra" id="composerExtra">
+        <select id="postSpaceSelect"></select>
+        <select id="postTypeSelect">
+          <option value="knowledge">Knowledge</option>
+          <option value="announcement">Announcement</option>
+        </select>
+        <input type="text" id="postBodyInput" placeholder="Add details (optional)">
+        <div id="pollOptionsWrap" style="display:none;">
+          <div class="poll-input-row"><input type="text" class="poll-opt" placeholder="Option 1"></div>
+          <div class="poll-input-row"><input type="text" class="poll-opt" placeholder="Option 2"></div>
+          <button class="add-option-btn" id="addOptionBtn">+ Add option</button>
+        </div>
+        <button class="composer-submit" id="postSubmitBtn">Post</button>
+      </div>
+    </div>
+
+    <div class="feed" id="feedList">
+      <div class="empty-state">Loading feed…</div>
+    </div>
+  </div>
+
+  <div class="aside">
+    <div class="aside-header">
+      <h2>Broadcast & Chat</h2>
+      <p>Live channels across your teams</p>
+    </div>
+    <div class="channel-tabs" id="channelTabs"></div>
+    <div class="chat-stream" id="chatStream">
+      <div class="empty-state">Select a channel</div>
+    </div>
+    <div class="broadcast-toggle">
+      <label><input type="checkbox" id="broadcastCheckbox"> Send as broadcast</label>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Message channel…">
+      <button class="send-btn" id="chatSendBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="modal-overlay" id="adminModalOverlay">
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Admin settings</h2>
+      <button class="close-modal-btn" id="closeAdminModal">×</button>
+    </div>
+    <div class="admin-tabs">
+      <div class="admin-tab active" data-tab="members">Members</div>
+      <div class="admin-tab" data-tab="spaces">Spaces & Channels</div>
+      <div class="admin-tab" data-tab="workspace">Workspace</div>
+    </div>
+
+    <div class="admin-tab-content active" id="tab-members">
+      <div class="invite-note">New members create their own account from the sign-in screen. Once they've signed up, they'll appear here — assign their role below. (Direct email invites need a small backend piece we haven't built yet.)</div>
+      <div id="membersList">Loading…</div>
+    </div>
+
+    <div class="admin-tab-content" id="tab-spaces">
+      <div class="admin-section-title">Knowledge Spaces</div>
+      <div id="spacesManageList"></div>
+      <div class="create-form">
+        <input type="text" id="newSpaceName" placeholder="New space name">
+        <input type="color" id="newSpaceColor" value="#5B6FE8">
+        <select id="newSpaceRole">
+          <option value="viewer">Visible to: everyone</option>
+          <option value="contributor">Contributor+</option>
+          <option value="manager">Manager+</option>
+          <option value="admin">Admin only</option>
+        </select>
+        <button id="createSpaceBtn">Add space</button>
+      </div>
+
+      <div class="admin-section-title">Broadcast Channels</div>
+      <div id="channelsManageList"></div>
+      <div class="create-form">
+        <input type="text" id="newChannelName" placeholder="New channel name">
+        <select id="newChannelRole">
+          <option value="viewer">Visible to: everyone</option>
+          <option value="contributor">Contributor+</option>
+          <option value="manager">Manager+</option>
+          <option value="admin">Admin only</option>
+        </select>
+        <button id="createChannelBtn">Add channel</button>
+      </div>
+    </div>
+
+    <div class="admin-tab-content" id="tab-workspace">
+      <div class="settings-field">
+        <label>Workspace name</label>
+        <input type="text" id="wsName">
+      </div>
+      <div class="settings-field">
+        <label>Tagline</label>
+        <input type="text" id="wsTagline">
+      </div>
+      <div class="settings-field">
+        <label>Branding colors</label>
+        <div class="color-row">
+          <div class="color-field"><input type="color" id="wsPrimary"><span>Primary</span></div>
+          <div class="color-field"><input type="color" id="wsAccent"><span>Accent</span></div>
+        </div>
+      </div>
+      <button class="save-settings-btn" id="saveWorkspaceBtn">Save changes</button>
+      <span class="save-toast" id="wsSaveToast">Saved ✓</span>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://nbigrpqqhumhzezwjbyc.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iaWdycHFxaHVtaHplendqYnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMTUyNzgsImV4cCI6MjA5ODU5MTI3OH0.EOUpNa1yJD2hk_ElmZVGBlgVb63xHmuXE-G2Lg7QWUM";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const AVATAR_COLORS = ['#5B6FE8','#2FA876','#E8A33D','#C0392B','#8B5CF6','#3457D5'];
+function colorFor(id){
+  let hash = 0;
+  for(let i=0;i<id.length;i++) hash = id.charCodeAt(i) + ((hash<<5)-hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+function initials(name){
+  if(!name) return "?";
+  const parts = name.trim().split(" ");
+  return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+}
+function timeAgo(ts){
+  const diff = (Date.now() - new Date(ts).getTime())/1000;
+  if(diff < 60) return "just now";
+  if(diff < 3600) return Math.floor(diff/60)+"m ago";
+  if(diff < 86400) return Math.floor(diff/3600)+"h ago";
+  return Math.floor(diff/86400)+"d ago";
+}
+
+let currentUser = null;
+let currentUserRole = 'viewer';
+const ROLE_LEVEL = { admin:4, manager:3, contributor:2, viewer:1 };
+let profilesCache = {};
+let spaces = [];
+let channels = [];
+let activeChannelId = null;
+let isSignUpMode = false;
+
+/* ---------------- AUTH ---------------- */
+const authError = document.getElementById('authError');
+const authLoading = document.getElementById('authLoading');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const authToggle = document.getElementById('authToggle');
+const nameField = document.getElementById('nameField');
+const authSub = document.getElementById('authSub');
+
+authToggle.onclick = () => {
+  isSignUpMode = !isSignUpMode;
+  nameField.style.display = isSignUpMode ? 'block' : 'none';
+  authSubmitBtn.textContent = isSignUpMode ? 'Create account' : 'Sign in';
+  authSub.textContent = isSignUpMode ? "Create your Cortex account" : "Sign in to your team's knowledge hub";
+  authToggle.innerHTML = isSignUpMode ? 'Already have an account? <b>Sign in</b>' : 'New here? <b>Create an account</b>';
+  authError.style.display = 'none';
+};
+
+authSubmitBtn.onclick = async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passwordInput').value;
+  const fullName = document.getElementById('fullNameInput').value.trim();
+  authError.style.display = 'none';
+
+  if(!email || !password || (isSignUpMode && !fullName)){
+    authError.textContent = "Please fill in all fields.";
+    authError.style.display = 'block';
+    return;
+  }
+
+  authLoading.style.display = 'block';
+  authSubmitBtn.disabled = true;
+
+  try{
+    if(isSignUpMode){
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { full_name: fullName } }
+      });
+      if(error) throw error;
+      if(data.user){
+        await sb.from('profiles').update({ full_name: fullName }).eq('id', data.user.id);
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    }
+  } catch(err){
+    authError.textContent = err.message || "Something went wrong.";
+    authError.style.display = 'block';
+  } finally {
+    authLoading.style.display = 'none';
+    authSubmitBtn.disabled = false;
+  }
+};
+
+document.getElementById('signOutBtn').onclick = async () => {
+  await sb.auth.signOut();
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('authScreen').style.display = 'flex';
+};
+
+sb.auth.onAuthStateChange((event, session) => {
+  if(session && session.user){
+    currentUser = session.user;
+    boot();
+  }
+});
+
+/* ---------------- BOOT ---------------- */
+async function boot(){
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+
+  let { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if(!profile){
+    // fallback in case trigger hasn't fired yet
+    await sb.from('profiles').insert({ id: currentUser.id, full_name: currentUser.email.split('@')[0], email: currentUser.email });
+    ({ data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single());
+  }
+  profilesCache[currentUser.id] = profile;
+  currentUserRole = profile.role || 'viewer';
+
+  const av = document.getElementById('myAvatar');
+  av.textContent = initials(profile.full_name);
+  av.style.background = colorFor(profile.id);
+  const cav = document.getElementById('composerAvatar');
+  cav.textContent = initials(profile.full_name);
+  cav.style.background = colorFor(profile.id);
+
+  applyRoleGating();
+  await loadWorkspaceSettings();
+  await loadSpaces();
+  await loadChannels();
+  await loadFeed();
+  subscribeRealtime();
+}
+
+/* ---------------- ROLE GATING ---------------- */
+function applyRoleGating(){
+  const level = ROLE_LEVEL[currentUserRole] || 1;
+
+  // Admin gear
+  document.getElementById('adminGearBtn').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
+
+  // Composer: contributor+ can post
+  const composer = document.querySelector('.composer');
+  if(level < ROLE_LEVEL.contributor){
+    composer.innerHTML = '<div class="view-only-note">You have view-only access. Reach out to your admin if you need to post.</div>';
+  }
+
+  // Broadcast checkbox: manager+ only
+  const broadcastToggle = document.querySelector('.broadcast-toggle');
+  if(level < ROLE_LEVEL.manager){
+    broadcastToggle.style.display = 'none';
+  }
+
+  // Chat input: contributor+ only
+  const chatInput = document.getElementById('chatInput');
+  const chatSendBtn = document.getElementById('chatSendBtn');
+  if(level < ROLE_LEVEL.contributor){
+    chatInput.placeholder = 'View only — you cannot send messages';
+    chatInput.disabled = true;
+    chatInput.classList.add('locked-input');
+    chatSendBtn.style.opacity = '0.4';
+    chatSendBtn.style.pointerEvents = 'none';
+  }
+}
+
+/* ---------------- PROFILES CACHE ---------------- */
+async function getProfile(id){
+  if(profilesCache[id]) return profilesCache[id];
+  const { data } = await sb.from('profiles').select('*').eq('id', id).single();
+  profilesCache[id] = data || { full_name: 'Unknown', id };
+  return profilesCache[id];
+}
+
+/* ---------------- SPACES ---------------- */
+async function loadSpaces(){
+  const { data } = await sb.from('spaces').select('*').order('name');
+  spaces = data || [];
+  document.getElementById('spacesList').innerHTML = spaces.map(s =>
+    `<div class="nav-item"><span class="channel-pill" style="background:${s.color}"></span>${s.name}</div>`
+  ).join('');
+  document.getElementById('postSpaceSelect').innerHTML = spaces.map(s =>
+    `<option value="${s.id}">${s.name}</option>`
+  ).join('');
+}
+
+/* ---------------- CHANNELS + CHAT ---------------- */
+async function loadChannels(){
+  const { data } = await sb.from('channels').select('*').order('name');
+  channels = data || [];
+  document.getElementById('channelsSidebarList').innerHTML = channels.map(c =>
+    `<div class="nav-item"><span class="channel-pill" style="background:#8B5CF6"></span>${c.name}</div>`
+  ).join('');
+  document.getElementById('channelTabs').innerHTML = channels.map((c,i) =>
+    `<div class="channel-tab ${i===0?'active':''}" data-id="${c.id}">${c.name}</div>`
+  ).join('');
+  document.querySelectorAll('.channel-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.channel-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeChannelId = tab.dataset.id;
+      loadMessages(activeChannelId);
+    };
+  });
+  if(channels.length){
+    activeChannelId = channels[0].id;
+    loadMessages(activeChannelId);
+  }
+}
+
+async function loadMessages(channelId){
+  const stream = document.getElementById('chatStream');
+  stream.innerHTML = '<div class="empty-state">Loading…</div>';
+  const { data } = await sb.from('messages').select('*').eq('channel_id', channelId).order('created_at', { ascending: true }).limit(50);
+  await renderMessages(data || []);
+}
+
+async function renderMessages(messages){
+  const stream = document.getElementById('chatStream');
+  if(!messages.length){
+    stream.innerHTML = '<div class="empty-state">No messages yet. Say hello 👋</div>';
+    return;
+  }
+  const html = await Promise.all(messages.map(async m => {
+    const p = await getProfile(m.author_id);
+    return `
+      <div class="chat-msg">
+        <div class="chat-avatar" style="background:${colorFor(p.id)};">${initials(p.full_name)}</div>
+        <div class="chat-body">
+          ${m.is_broadcast ? '<span class="broadcast-badge"><span class="pulse"></span>BROADCAST</span><br>' : ''}
+          <span class="name">${p.full_name}</span><span class="time">${timeAgo(m.created_at)}</span>
+          <p>${escapeHtml(m.body)}</p>
+        </div>
+      </div>`;
+  }));
+  stream.innerHTML = html.join('');
+  stream.scrollTop = stream.scrollHeight;
+}
+
+document.getElementById('chatSendBtn').onclick = sendMessage;
+document.getElementById('chatInput').addEventListener('keydown', e => { if(e.key === 'Enter') sendMessage(); });
+
+async function sendMessage(){
+  const input = document.getElementById('chatInput');
+  const body = input.value.trim();
+  if(!body || !activeChannelId) return;
+  const isBroadcast = document.getElementById('broadcastCheckbox').checked;
+  input.value = '';
+  await sb.from('messages').insert({
+    channel_id: activeChannelId,
+    author_id: currentUser.id,
+    body,
+    is_broadcast: isBroadcast
+  });
+}
+
+/* ---------------- FEED ---------------- */
+document.getElementById('pollToggleBtn').onclick = () => {
+  const extra = document.getElementById('composerExtra');
+  const pollWrap = document.getElementById('pollOptionsWrap');
+  extra.classList.add('visible');
+  const btn = document.getElementById('pollToggleBtn');
+  const isPoll = pollWrap.style.display === 'none';
+  pollWrap.style.display = isPoll ? 'block' : 'none';
+  btn.classList.toggle('active', isPoll);
+};
+document.getElementById('postTitleInput').addEventListener('focus', () => {
+  document.getElementById('composerExtra').classList.add('visible');
+});
+document.getElementById('addOptionBtn').onclick = () => {
+  const wrap = document.getElementById('pollOptionsWrap');
+  const row = document.createElement('div');
+  row.className = 'poll-input-row';
+  row.innerHTML = `<input type="text" class="poll-opt" placeholder="Option ${wrap.querySelectorAll('.poll-opt').length+1}">`;
+  wrap.insertBefore(row, document.getElementById('addOptionBtn'));
+};
+
+document.getElementById('postSubmitBtn').onclick = async () => {
+  const title = document.getElementById('postTitleInput').value.trim();
+  const body = document.getElementById('postBodyInput').value.trim();
+  const spaceId = document.getElementById('postSpaceSelect').value;
+  const isPoll = document.getElementById('pollOptionsWrap').style.display !== 'none';
+  const type = isPoll ? 'poll' : document.getElementById('postTypeSelect').value;
+  if(!title) return;
+
+  const { data: post, error } = await sb.from('posts').insert({
+    space_id: spaceId, author_id: currentUser.id, type, title, body
+  }).select().single();
+  if(error){ console.error(error); return; }
+
+  if(isPoll){
+    const opts = Array.from(document.querySelectorAll('.poll-opt')).map(i => i.value.trim()).filter(Boolean);
+    if(opts.length){
+      await sb.from('poll_options').insert(opts.map(label => ({ post_id: post.id, label })));
+    }
+  }
+
+  document.getElementById('postTitleInput').value = '';
+  document.getElementById('postBodyInput').value = '';
+  document.querySelectorAll('.poll-opt').forEach(i => i.value = '');
+  document.getElementById('composerExtra').classList.remove('visible');
+  document.getElementById('pollOptionsWrap').style.display = 'none';
+  document.getElementById('pollToggleBtn').classList.remove('active');
+};
+
+async function loadFeed(){
+  const { data: posts } = await sb.from('posts').select('*').order('created_at', { ascending: false }).limit(30);
+  await renderFeed(posts || []);
+}
+
+async function renderFeed(posts){
+  const feedList = document.getElementById('feedList');
+  if(!posts.length){
+    feedList.innerHTML = '<div class="empty-state">No posts yet. Be the first to share something.</div>';
+    return;
+  }
+  const html = await Promise.all(posts.map(renderPost));
+  feedList.innerHTML = html.join('');
+  attachPollHandlers();
+}
+
+async function renderPost(post){
+  const author = await getProfile(post.author_id);
+  const space = spaces.find(s => s.id === post.space_id);
+  const tagClass = `tag-${post.type}`;
+
+  let pollHtml = '';
+  if(post.type === 'poll'){
+    const { data: options } = await sb.from('poll_options').select('*').eq('post_id', post.id);
+    const { data: votes } = await sb.from('poll_votes').select('*').in('option_id', (options||[]).map(o=>o.id));
+    const total = (votes||[]).length;
+    const myVote = (votes||[]).find(v => v.user_id === currentUser.id);
+
+    pollHtml = (options||[]).map(opt => {
+      const count = (votes||[]).filter(v => v.option_id === opt.id).length;
+      const pct = total ? Math.round((count/total)*100) : 0;
+      const voted = myVote && myVote.option_id === opt.id;
+      return `
+        <div class="poll-option ${voted?'voted':''}" data-post="${post.id}" data-option="${opt.id}">
+          <div class="poll-fill" style="width:${pct}%"></div>
+          <div class="label"><span>${escapeHtml(opt.label)}</span><span class="pct">${pct}%</span></div>
+        </div>`;
+    }).join('') + `<div class="poll-total">${total} vote${total!==1?'s':''}</div>`;
+  }
+
+  return `
+    <div class="post">
+      <div class="post-head">
+        <div class="post-avatar" style="background:${colorFor(author.id)};">${initials(author.full_name)}</div>
+        <div class="post-meta">
+          <span class="name">${author.full_name}</span>
+          <span class="sub mono">${space ? space.name : 'General'} · ${timeAgo(post.created_at)}</span>
+        </div>
+        <span class="post-tag ${tagClass}">${post.type.charAt(0).toUpperCase()+post.type.slice(1)}</span>
+      </div>
+      <h3>${escapeHtml(post.title)}</h3>
+      ${post.body ? `<p>${escapeHtml(post.body)}</p>` : ''}
+      ${pollHtml}
+    </div>`;
+}
+
+function attachPollHandlers(){
+  document.querySelectorAll('.poll-option').forEach(el => {
+    el.onclick = async () => {
+      const optionId = el.dataset.option;
+      // remove any existing vote by this user among sibling options, then cast new
+      const postCard = el.closest('.post');
+      const sameOptionEls = postCard.querySelectorAll('.poll-option');
+      const optionIds = Array.from(sameOptionEls).map(o => o.dataset.option);
+      const { data: existing } = await sb.from('poll_votes').select('*').eq('user_id', currentUser.id).in('option_id', optionIds);
+      if(existing && existing.length){
+        await sb.from('poll_votes').delete().eq('id', existing[0].id);
+        if(existing[0].option_id === optionId){ await loadFeed(); return; } // toggled off
+      }
+      await sb.from('poll_votes').insert({ option_id: optionId, user_id: currentUser.id });
+      await loadFeed();
+    };
+  });
+}
+
+/* ---------------- WORKSPACE SETTINGS ---------------- */
+async function loadWorkspaceSettings(){
+  const { data } = await sb.from('workspace_settings').select('*').eq('id', 1).single();
+  if(!data) return;
+  document.querySelectorAll('.brand').forEach(b => {
+    const textNode = Array.from(b.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+    if(textNode) textNode.textContent = data.workspace_name;
+  });
+  document.title = data.workspace_name + ' — ' + (data.tagline || 'Team knowledge hub');
+  document.documentElement.style.setProperty('--navy', data.primary_color || '#16213E');
+  document.documentElement.style.setProperty('--amber', data.accent_color || '#E8A33D');
+
+  // pre-fill settings form
+  document.getElementById('wsName').value = data.workspace_name || '';
+  document.getElementById('wsTagline').value = data.tagline || '';
+  document.getElementById('wsPrimary').value = data.primary_color || '#16213E';
+  document.getElementById('wsAccent').value = data.accent_color || '#E8A33D';
+}
+
+document.getElementById('saveWorkspaceBtn').onclick = async () => {
+  const payload = {
+    workspace_name: document.getElementById('wsName').value.trim() || 'Cortex',
+    tagline: document.getElementById('wsTagline').value.trim(),
+    primary_color: document.getElementById('wsPrimary').value,
+    accent_color: document.getElementById('wsAccent').value
+  };
+  const { error } = await sb.from('workspace_settings').update(payload).eq('id', 1);
+  if(!error){
+    await loadWorkspaceSettings();
+    const toast = document.getElementById('wsSaveToast');
+    toast.style.display = 'inline';
+    setTimeout(() => toast.style.display = 'none', 2000);
+  }
+};
+
+/* ---------------- ADMIN MODAL ---------------- */
+const adminModalOverlay = document.getElementById('adminModalOverlay');
+document.getElementById('adminGearBtn').onclick = () => {
+  adminModalOverlay.classList.add('visible');
+  loadMembersTab();
+  loadSpacesManageTab();
+};
+document.getElementById('closeAdminModal').onclick = () => adminModalOverlay.classList.remove('visible');
+adminModalOverlay.onclick = (e) => { if(e.target === adminModalOverlay) adminModalOverlay.classList.remove('visible'); };
+
+document.querySelectorAll('.admin-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  };
+});
+
+async function loadMembersTab(){
+  const wrap = document.getElementById('membersList');
+  const { data: members } = await sb.from('profiles').select('*').order('full_name');
+  if(!members || !members.length){ wrap.innerHTML = '<div class="empty-state">No members yet.</div>'; return; }
+  wrap.innerHTML = members.map(m => `
+    <div class="member-row">
+      <div class="avatar" style="background:${colorFor(m.id)};">${initials(m.full_name)}</div>
+      <div class="member-info">
+        <div class="name">${escapeHtml(m.full_name)}${m.id === currentUser.id ? ' (you)' : ''}</div>
+        <div class="email">${escapeHtml(m.email || '')}</div>
+      </div>
+      <select class="role-select" data-user="${m.id}" ${m.id === currentUser.id ? 'disabled' : ''}>
+        ${['admin','manager','contributor','viewer'].map(r => `<option value="${r}" ${r===m.role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.role-select').forEach(sel => {
+    sel.onchange = async () => {
+      const { error } = await sb.from('profiles').update({ role: sel.value }).eq('id', sel.dataset.user);
+      if(error) alert('Could not update role: ' + error.message);
+    };
+  });
+}
+
+async function loadSpacesManageTab(){
+  const { data: allSpaces } = await sb.from('spaces').select('*').order('name');
+  const spacesWrap = document.getElementById('spacesManageList');
+  spacesWrap.innerHTML = (allSpaces||[]).map(s => `
+    <div class="manage-row">
+      <span class="swatch" style="background:${s.color}"></span>
+      <span class="item-name">${escapeHtml(s.name)}</span>
+      <select class="space-role-select" data-id="${s.id}">
+        ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===s.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
+      </select>
+      <button class="delete-btn" data-type="space" data-id="${s.id}">Delete</button>
+    </div>
+  `).join('') || '<div class="empty-state">No spaces yet.</div>';
+
+  const { data: allChannels } = await sb.from('channels').select('*').order('name');
+  const channelsWrap = document.getElementById('channelsManageList');
+  channelsWrap.innerHTML = (allChannels||[]).map(c => `
+    <div class="manage-row">
+      <span class="swatch" style="background:#8B5CF6"></span>
+      <span class="item-name">${escapeHtml(c.name)}</span>
+      <select class="channel-role-select" data-id="${c.id}">
+        ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===c.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
+      </select>
+      <button class="delete-btn" data-type="channel" data-id="${c.id}">Delete</button>
+    </div>
+  `).join('') || '<div class="empty-state">No channels yet.</div>';
+
+  spacesWrap.querySelectorAll('.space-role-select').forEach(sel => {
+    sel.onchange = async () => { await sb.from('spaces').update({ default_min_role: sel.value }).eq('id', sel.dataset.id); };
+  });
+  channelsWrap.querySelectorAll('.channel-role-select').forEach(sel => {
+    sel.onchange = async () => { await sb.from('channels').update({ default_min_role: sel.value }).eq('id', sel.dataset.id); };
+  });
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if(!confirm('Delete this ' + btn.dataset.type + '? This removes its posts/messages too.')) return;
+      const table = btn.dataset.type === 'space' ? 'spaces' : 'channels';
+      await sb.from(table).delete().eq('id', btn.dataset.id);
+      await loadSpacesManageTab();
+      await loadSpaces();
+      await loadChannels();
+    };
+  });
+}
+
+document.getElementById('createSpaceBtn').onclick = async () => {
+  const name = document.getElementById('newSpaceName').value.trim();
+  if(!name) return;
+  const { error } = await sb.from('spaces').insert({
+    name, color: document.getElementById('newSpaceColor').value,
+    default_min_role: document.getElementById('newSpaceRole').value,
+    created_by: currentUser.id
+  });
+  if(error){ alert(error.message); return; }
+  document.getElementById('newSpaceName').value = '';
+  await loadSpacesManageTab();
+  await loadSpaces();
+};
+
+document.getElementById('createChannelBtn').onclick = async () => {
+  const name = document.getElementById('newChannelName').value.trim();
+  if(!name) return;
+  const { error } = await sb.from('channels').insert({
+    name, default_min_role: document.getElementById('newChannelRole').value
+  });
+  if(error){ alert(error.message); return; }
+  document.getElementById('newChannelName').value = '';
+  await loadSpacesManageTab();
+  await loadChannels();
+};
+
+/* ---------------- REALTIME ---------------- */
+function subscribeRealtime(){
+  sb.channel('public:messages')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+      if(payload.new.channel_id === activeChannelId) loadMessages(activeChannelId);
+    })
+    .subscribe();
+
+  sb.channel('public:posts')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => loadFeed())
+    .subscribe();
+
+  sb.channel('public:poll_votes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => loadFeed())
+    .subscribe();
+}
+
+/* ---------------- UTIL ---------------- */
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+/* ---------------- SESSION CHECK ON LOAD ---------------- */
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if(session && session.user){
+    currentUser = session.user;
+    boot();
+  }
+})();
+</script>
+
+</body>
+</html>
