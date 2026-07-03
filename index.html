@@ -349,6 +349,22 @@
     font-size:13px; font-weight:600; margin-top:6px;
   }
   .save-toast{font-size:12px; color:var(--green); margin-left:12px; display:none;}
+
+  .access-panel{
+    background:var(--bg); border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; margin:2px 0 12px; display:flex; flex-direction:column; gap:7px;
+  }
+  .member-access-row{
+    display:flex; align-items:center; justify-content:space-between; font-size:12.5px;
+  }
+  .member-access-row select{
+    padding:4px 7px; border:1px solid var(--line); border-radius:6px; font-size:11.5px;
+  }
+  .access-btn{
+    background:none; border:1px solid var(--line); color:var(--text-mute);
+    font-size:11.5px; padding:4px 10px; border-radius:6px; margin-right:4px;
+  }
+  .access-btn:hover{border-color:var(--amber); color:var(--navy);}
 </style>
 </head>
 <body>
@@ -685,7 +701,7 @@ function applyRoleGating(){
   document.getElementById('adminGearBtn').style.display = level >= ROLE_LEVEL.manager ? 'flex' : 'none';
   const spacesTab = document.querySelector('.admin-tab[data-tab="spaces"]');
   const workspaceTab = document.querySelector('.admin-tab[data-tab="workspace"]');
-  if(spacesTab) spacesTab.style.display = currentUserRole === 'admin' ? 'block' : 'none';
+  if(spacesTab) spacesTab.style.display = level >= ROLE_LEVEL.manager ? 'block' : 'none';
   if(workspaceTab) workspaceTab.style.display = currentUserRole === 'admin' ? 'block' : 'none';
 
   // Composer: contributor+ can post
@@ -970,7 +986,7 @@ document.getElementById('adminGearBtn').onclick = () => {
   document.querySelector('.admin-tab[data-tab="members"]').classList.add('active');
   document.getElementById('tab-members').classList.add('active');
   loadMembersTab();
-  if(currentUserRole === 'admin') loadSpacesManageTab();
+  if(ROLE_LEVEL[currentUserRole] >= ROLE_LEVEL.manager) loadSpacesManageTab();
 };
 document.getElementById('closeAdminModal').onclick = () => adminModalOverlay.classList.remove('visible');
 adminModalOverlay.onclick = (e) => { if(e.target === adminModalOverlay) adminModalOverlay.classList.remove('visible'); };
@@ -1054,12 +1070,13 @@ async function loadSpacesManageTab(){
   const { data: allSpaces } = await sb.from('spaces').select('*').order('name');
   const spacesWrap = document.getElementById('spacesManageList');
   spacesWrap.innerHTML = (allSpaces||[]).map(s => `
-    <div class="manage-row">
+    <div class="manage-row" data-type="space" data-id="${s.id}">
       <span class="swatch" style="background:${s.color}"></span>
       <span class="item-name">${escapeHtml(s.name)}</span>
       <select class="space-role-select" data-id="${s.id}">
         ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===s.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
       </select>
+      <button class="access-btn" data-type="space" data-id="${s.id}">Access</button>
       <button class="delete-btn" data-type="space" data-id="${s.id}">Delete</button>
     </div>
   `).join('') || '<div class="empty-state">No spaces yet.</div>';
@@ -1067,12 +1084,13 @@ async function loadSpacesManageTab(){
   const { data: allChannels } = await sb.from('channels').select('*').order('name');
   const channelsWrap = document.getElementById('channelsManageList');
   channelsWrap.innerHTML = (allChannels||[]).map(c => `
-    <div class="manage-row">
+    <div class="manage-row" data-type="channel" data-id="${c.id}">
       <span class="swatch" style="background:#8B5CF6"></span>
       <span class="item-name">${escapeHtml(c.name)}</span>
       <select class="channel-role-select" data-id="${c.id}">
         ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===c.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
       </select>
+      <button class="access-btn" data-type="channel" data-id="${c.id}">Access</button>
       <button class="delete-btn" data-type="channel" data-id="${c.id}">Delete</button>
     </div>
   `).join('') || '<div class="empty-state">No channels yet.</div>';
@@ -1091,6 +1109,56 @@ async function loadSpacesManageTab(){
       await loadSpacesManageTab();
       await loadSpaces();
       await loadChannels();
+    };
+  });
+  document.querySelectorAll('.access-btn').forEach(btn => {
+    btn.onclick = () => toggleAccessPanel(btn.dataset.type, btn.dataset.id, btn.closest('.manage-row'));
+  });
+}
+
+async function toggleAccessPanel(type, id, row){
+  const existing = row.nextElementSibling;
+  if(existing && existing.classList.contains('access-panel')){
+    existing.remove();
+    return;
+  }
+  // close any other open panels first
+  document.querySelectorAll('.access-panel').forEach(p => p.remove());
+
+  const panel = document.createElement('div');
+  panel.className = 'access-panel';
+  panel.innerHTML = '<div class="empty-state">Loading members…</div>';
+  row.after(panel);
+
+  const table = type === 'space' ? 'space_members' : 'channel_members';
+  const col = type === 'space' ? 'space_id' : 'channel_id';
+
+  const { data: members } = await sb.from('profiles').select('*').order('full_name');
+  const { data: overrides } = await sb.from(table).select('*').eq(col, id);
+  const overrideMap = {};
+  (overrides||[]).forEach(o => overrideMap[o.user_id] = o.access);
+
+  panel.innerHTML = (members||[]).map(m => {
+    const val = overrideMap[m.id] === true ? 'allow' : overrideMap[m.id] === false ? 'block' : 'default';
+    return `
+      <div class="member-access-row">
+        <span>${escapeHtml(m.full_name)} <span class="mono" style="color:var(--text-faint); font-size:10.5px;">${m.role}</span></span>
+        <select class="access-select" data-user="${m.id}">
+          <option value="default" ${val==='default'?'selected':''}>Use default (role-based)</option>
+          <option value="allow" ${val==='allow'?'selected':''}>Always allow</option>
+          <option value="block" ${val==='block'?'selected':''}>Always block</option>
+        </select>
+      </div>`;
+  }).join('');
+
+  panel.querySelectorAll('.access-select').forEach(sel => {
+    sel.onchange = async () => {
+      const userId = sel.dataset.user;
+      if(sel.value === 'default'){
+        await sb.from(table).delete().eq(col, id).eq('user_id', userId);
+      } else {
+        await sb.from(table).upsert({ [col]: id, user_id: userId, access: sel.value === 'allow' });
+      }
     };
   });
 }
