@@ -484,7 +484,15 @@
     </div>
 
     <div class="admin-tab-content active" id="tab-members">
-      <div class="invite-note">New members create their own account from the sign-in screen. Once they've signed up, they'll appear here — assign their role below. (Direct email invites need a small backend piece we haven't built yet.)</div>
+      <div class="admin-section-title">Add a member</div>
+      <div class="create-form" style="margin-top:0; margin-bottom:20px;">
+        <input type="text" id="newMemberName" placeholder="Full name">
+        <input type="text" id="newMemberEmail" placeholder="Email">
+        <input type="text" id="newMemberPassword" placeholder="Temporary password">
+        <select id="newMemberRole"></select>
+        <button id="addMemberBtn">Create user</button>
+      </div>
+      <div class="admin-section-title">All members</div>
       <div id="membersList">Loading…</div>
     </div>
 
@@ -673,8 +681,12 @@ async function boot(){
 function applyRoleGating(){
   const level = ROLE_LEVEL[currentUserRole] || 1;
 
-  // Admin gear
-  document.getElementById('adminGearBtn').style.display = currentUserRole === 'admin' ? 'flex' : 'none';
+  // Admin/Manager gear -- Admins get full panel, Managers get Members tab only
+  document.getElementById('adminGearBtn').style.display = level >= ROLE_LEVEL.manager ? 'flex' : 'none';
+  const spacesTab = document.querySelector('.admin-tab[data-tab="spaces"]');
+  const workspaceTab = document.querySelector('.admin-tab[data-tab="workspace"]');
+  if(spacesTab) spacesTab.style.display = currentUserRole === 'admin' ? 'block' : 'none';
+  if(workspaceTab) workspaceTab.style.display = currentUserRole === 'admin' ? 'block' : 'none';
 
   // Composer: contributor+ can post
   const composer = document.querySelector('.composer');
@@ -953,8 +965,12 @@ document.getElementById('saveWorkspaceBtn').onclick = async () => {
 const adminModalOverlay = document.getElementById('adminModalOverlay');
 document.getElementById('adminGearBtn').onclick = () => {
   adminModalOverlay.classList.add('visible');
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('.admin-tab[data-tab="members"]').classList.add('active');
+  document.getElementById('tab-members').classList.add('active');
   loadMembersTab();
-  loadSpacesManageTab();
+  if(currentUserRole === 'admin') loadSpacesManageTab();
 };
 document.getElementById('closeAdminModal').onclick = () => adminModalOverlay.classList.remove('visible');
 adminModalOverlay.onclick = (e) => { if(e.target === adminModalOverlay) adminModalOverlay.classList.remove('visible'); };
@@ -969,9 +985,17 @@ document.querySelectorAll('.admin-tab').forEach(tab => {
 });
 
 async function loadMembersTab(){
+  const roleOptions = currentUserRole === 'admin'
+    ? ['admin','manager','contributor','viewer']
+    : ['contributor','viewer'];
+  document.getElementById('newMemberRole').innerHTML = roleOptions.map(r =>
+    `<option value="${r}">${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
+  ).join('');
+
   const wrap = document.getElementById('membersList');
   const { data: members } = await sb.from('profiles').select('*').order('full_name');
   if(!members || !members.length){ wrap.innerHTML = '<div class="empty-state">No members yet.</div>'; return; }
+  const canEditRoles = currentUserRole === 'admin';
   wrap.innerHTML = members.map(m => `
     <div class="member-row">
       <div class="avatar" style="background:${colorFor(m.id)};">${initials(m.full_name)}</div>
@@ -979,7 +1003,7 @@ async function loadMembersTab(){
         <div class="name">${escapeHtml(m.full_name)}${m.id === currentUser.id ? ' (you)' : ''}</div>
         <div class="email">${escapeHtml(m.email || '')}</div>
       </div>
-      <select class="role-select" data-user="${m.id}" ${m.id === currentUser.id ? 'disabled' : ''}>
+      <select class="role-select" data-user="${m.id}" ${(!canEditRoles || m.id === currentUser.id) ? 'disabled' : ''}>
         ${['admin','manager','contributor','viewer'].map(r => `<option value="${r}" ${r===m.role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
       </select>
     </div>
@@ -991,6 +1015,40 @@ async function loadMembersTab(){
     };
   });
 }
+
+document.getElementById('addMemberBtn').onclick = async () => {
+  const full_name = document.getElementById('newMemberName').value.trim();
+  const email = document.getElementById('newMemberEmail').value.trim();
+  const password = document.getElementById('newMemberPassword').value;
+  const role = document.getElementById('newMemberRole').value;
+  if(!full_name || !email || !password){ alert('Fill in name, email, and a temporary password.'); return; }
+
+  const btn = document.getElementById('addMemberBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ email, password, full_name, role })
+    });
+    const result = await res.json();
+    if(!res.ok) throw new Error(result.error || 'Failed to create user');
+    document.getElementById('newMemberName').value = '';
+    document.getElementById('newMemberEmail').value = '';
+    document.getElementById('newMemberPassword').value = '';
+    await loadMembersTab();
+  } catch(err){
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create user';
+  }
+};
 
 async function loadSpacesManageTab(){
   const { data: allSpaces } = await sb.from('spaces').select('*').order('name');
