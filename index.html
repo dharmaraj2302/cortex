@@ -366,6 +366,37 @@
   }
   .access-btn:hover{border-color:var(--amber); color:var(--navy);}
   .lock-badge{font-size:11px; margin-left:4px; opacity:0.7; cursor:help;}
+
+  .admin-only-label{
+    display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-mute); margin-left:8px;
+  }
+
+  /* ---------- Notifications ---------- */
+  .notif-badge{
+    position:absolute; top:4px; right:4px; min-width:15px; height:15px; border-radius:8px;
+    background:#C0392B; color:#fff; font-size:9.5px; font-weight:700;
+    display:none; align-items:center; justify-content:center; padding:0 3px;
+  }
+  .notif-panel{
+    display:none; position:fixed; top:56px; right:24px; width:340px; max-height:440px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25); z-index:90; flex-direction:column; overflow:hidden;
+  }
+  .notif-panel.visible{display:flex;}
+  .notif-panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; border-bottom:1px solid var(--line);
+  }
+  .notif-panel-head h3{font-size:14px; font-weight:700;}
+  .mark-all-btn{font-size:11px; color:var(--text-mute); background:none; border:none;}
+  .mark-all-btn:hover{color:var(--navy);}
+  .notif-list{overflow-y:auto; flex:1;}
+  .notif-item{padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer;}
+  .notif-item:hover{background:var(--bg);}
+  .notif-item.unread{background:var(--amber-soft);}
+  .notif-item .title{font-size:12.5px; font-weight:600;}
+  .notif-item .body{font-size:11.5px; color:var(--text-mute); margin-top:2px; line-height:1.4;}
+  .notif-item .time{font-size:10px; color:var(--text-faint); margin-top:5px; font-family:'IBM Plex Mono',monospace;}
 </style>
 </head>
 <body>
@@ -406,6 +437,10 @@
     </div>
     <div class="topbar-right">
       <button class="signout-btn" id="signOutBtn">Sign out</button>
+      <button class="gear-btn" id="notifBtn" title="Notifications" style="position:relative;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="notif-badge" id="notifBadge">0</span>
+      </button>
       <button class="gear-btn" id="adminGearBtn" style="display:none;" title="Admin settings">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       </button>
@@ -485,6 +520,15 @@
     </div>
   </div>
 
+</div>
+
+<!-- NOTIFICATIONS PANEL -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-panel-head">
+    <h3>Notifications</h3>
+    <button class="mark-all-btn" id="markAllReadBtn">Mark all read</button>
+  </div>
+  <div class="notif-list" id="notifList"><div class="empty-state">Loading…</div></div>
 </div>
 
 <!-- ADMIN MODAL -->
@@ -691,8 +735,63 @@ async function boot(){
   await loadSpaces();
   await loadChannels();
   await loadFeed();
+  await loadNotifications();
   subscribeRealtime();
 }
+
+/* ---------------- NOTIFICATIONS ---------------- */
+async function loadNotifications(){
+  const { data } = await sb.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
+  renderNotifications(data || []);
+}
+
+function renderNotifications(list){
+  const unread = list.filter(n => !n.is_read).length;
+  const badge = document.getElementById('notifBadge');
+  if(unread > 0){
+    badge.style.display = 'flex';
+    badge.textContent = unread > 9 ? '9+' : unread;
+  } else {
+    badge.style.display = 'none';
+  }
+
+  const wrap = document.getElementById('notifList');
+  if(!list.length){ wrap.innerHTML = '<div class="empty-state">No notifications yet.</div>'; return; }
+  wrap.innerHTML = list.map(n => `
+    <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
+      <div class="title">${escapeHtml(n.title)}</div>
+      ${n.body ? `<div class="body">${escapeHtml(n.body)}</div>` : ''}
+      <div class="time">${timeAgo(n.created_at)}</div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.notif-item').forEach(item => {
+    item.onclick = async () => {
+      if(item.classList.contains('unread')){
+        await sb.from('notifications').update({ is_read: true }).eq('id', item.dataset.id);
+        item.classList.remove('unread');
+        await loadNotifications();
+      }
+    };
+  });
+}
+
+document.getElementById('notifBtn').onclick = (e) => {
+  e.stopPropagation();
+  const panel = document.getElementById('notifPanel');
+  panel.classList.toggle('visible');
+  if(panel.classList.contains('visible')) loadNotifications();
+};
+document.getElementById('markAllReadBtn').onclick = async () => {
+  await sb.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+  await loadNotifications();
+};
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notifPanel');
+  const btn = document.getElementById('notifBtn');
+  if(panel.classList.contains('visible') && !panel.contains(e.target) && !btn.contains(e.target)){
+    panel.classList.remove('visible');
+  }
+});
 
 /* ---------------- ROLE GATING ---------------- */
 function applyRoleGating(){
@@ -1077,7 +1176,8 @@ async function loadSpacesManageTab(){
       <select class="space-role-select" data-id="${s.id}">
         ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===s.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
       </select>
-      <button class="access-btn" data-type="space" data-id="${s.id}">Access</button>
+      <label class="admin-only-label"><input type="checkbox" class="admin-only-toggle" data-type="space" data-id="${s.id}" ${s.admin_only_access?'checked':''} ${currentUserRole!=='admin'?'disabled':''}>Admin-only</label>
+      <button class="access-btn" data-type="space" data-id="${s.id}" ${(currentUserRole!=='admin' && s.admin_only_access)?'disabled title="Admin-only — managers can\'t grant access here"':''}>Access</button>
       <button class="delete-btn" data-type="space" data-id="${s.id}">Delete</button>
     </div>
   `).join('') || '<div class="empty-state">No spaces yet.</div>';
@@ -1091,7 +1191,8 @@ async function loadSpacesManageTab(){
       <select class="channel-role-select" data-id="${c.id}">
         ${['viewer','contributor','manager','admin'].map(r => `<option value="${r}" ${r===c.default_min_role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}+</option>`).join('')}
       </select>
-      <button class="access-btn" data-type="channel" data-id="${c.id}">Access</button>
+      <label class="admin-only-label"><input type="checkbox" class="admin-only-toggle" data-type="channel" data-id="${c.id}" ${c.admin_only_access?'checked':''} ${currentUserRole!=='admin'?'disabled':''}>Admin-only</label>
+      <button class="access-btn" data-type="channel" data-id="${c.id}" ${(currentUserRole!=='admin' && c.admin_only_access)?'disabled title="Admin-only — managers can\'t grant access here"':''}>Access</button>
       <button class="delete-btn" data-type="channel" data-id="${c.id}">Delete</button>
     </div>
   `).join('') || '<div class="empty-state">No channels yet.</div>';
@@ -1101,6 +1202,14 @@ async function loadSpacesManageTab(){
   });
   channelsWrap.querySelectorAll('.channel-role-select').forEach(sel => {
     sel.onchange = async () => { await sb.from('channels').update({ default_min_role: sel.value }).eq('id', sel.dataset.id); };
+  });
+  document.querySelectorAll('.admin-only-toggle').forEach(cb => {
+    cb.onchange = async () => {
+      const table = cb.dataset.type === 'space' ? 'spaces' : 'channels';
+      const { error } = await sb.from(table).update({ admin_only_access: cb.checked }).eq('id', cb.dataset.id);
+      if(error){ alert(error.message); cb.checked = !cb.checked; return; }
+      await loadSpacesManageTab();
+    };
   });
   document.querySelectorAll('.delete-btn').forEach(btn => {
     btn.onclick = async () => {
@@ -1113,6 +1222,7 @@ async function loadSpacesManageTab(){
     };
   });
   document.querySelectorAll('.access-btn').forEach(btn => {
+    if(btn.disabled) return;
     btn.onclick = () => toggleAccessPanel(btn.dataset.type, btn.dataset.id, btn.closest('.manage-row'));
   });
 }
@@ -1133,6 +1243,10 @@ async function toggleAccessPanel(type, id, row){
 
   const table = type === 'space' ? 'space_members' : 'channel_members';
   const col = type === 'space' ? 'space_id' : 'channel_id';
+  const parentTable = type === 'space' ? 'spaces' : 'channels';
+
+  const { data: parent } = await sb.from(parentTable).select('admin_only_access').eq('id', id).single();
+  const parentLocked = currentUserRole !== 'admin' && parent?.admin_only_access;
 
   const { data: members } = await sb.from('profiles').select('*').order('full_name');
   const { data: overrides } = await sb.from(table).select('*').eq(col, id);
@@ -1142,7 +1256,7 @@ async function toggleAccessPanel(type, id, row){
   panel.innerHTML = (members||[]).map(m => {
     const ov = overrideMap[m.id];
     const val = ov ? (ov.access ? 'allow' : 'block') : 'default';
-    const lockedByAdmin = currentUserRole !== 'admin' && (m.role === 'admin' || (ov && ov.set_by_role === 'admin'));
+    const lockedByAdmin = parentLocked || (currentUserRole !== 'admin' && (m.role === 'admin' || (ov && ov.set_by_role === 'admin')));
     return `
       <div class="member-access-row">
         <span>${escapeHtml(m.full_name)} <span class="mono" style="color:var(--text-faint); font-size:10.5px;">${m.role}</span>${lockedByAdmin ? '<span class="lock-badge" title="Set by an admin — managers can\'t change this">🔒</span>' : ''}</span>
@@ -1214,6 +1328,10 @@ function subscribeRealtime(){
 
   sb.channel('public:poll_votes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => loadFeed())
+    .subscribe();
+
+  sb.channel('public:notifications')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUser.id}` }, () => loadNotifications())
     .subscribe();
 }
 
