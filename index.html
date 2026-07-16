@@ -179,6 +179,7 @@
   }
   .rte-btn:hover{border-color:var(--amber); color:var(--navy);}
   .rte-btn.image-btn{width:auto; padding:0 10px; font-size:11.5px; gap:4px;}
+  .rte-divider{width:1px; background:var(--line); margin:2px 2px;}
   .rte-body{
     width:100%; min-height:60px; max-height:220px; overflow-y:auto;
     border:1px solid var(--line); border-radius:7px; padding:9px 11px;
@@ -187,6 +188,8 @@
   .rte-body:focus{border-color:var(--amber);}
   .rte-body:empty:before{content: attr(data-placeholder); color:var(--text-faint);}
   .rte-body ul, .rte-body ol{margin-left:20px;}
+  .rte-body p, .rte-body div{margin:0 0 8px 0;}
+  .rte-body p:last-child, .rte-body div:last-child{margin-bottom:0;}
   .image-preview-wrap{
     display:none; align-items:center; gap:10px; margin-bottom:8px;
     background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px;
@@ -199,6 +202,8 @@
   /* ---------- Post body / image ---------- */
   .post-body-rich{font-size:13.5px; color:var(--text-mute); line-height:1.6;}
   .post-body-rich ul, .post-body-rich ol{margin-left:20px;}
+  .post-body-rich p, .post-body-rich div{margin:0 0 8px 0;}
+  .post-body-rich p:last-child, .post-body-rich div:last-child{margin-bottom:0;}
   .post-image{max-width:100%; border-radius:8px; margin-top:10px; display:block;}
   .repost-banner{font-size:11px; color:var(--text-faint); font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:5px;}
 
@@ -547,8 +552,14 @@
           <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><b>B</b></button>
           <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><i>I</i></button>
           <button type="button" class="rte-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+          <span class="rte-divider"></span>
+          <button type="button" class="rte-btn" data-cmd="justifyLeft" title="Align left"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2"/><rect x="1" y="7" width="9" height="2"/><rect x="1" y="12" width="12" height="2"/></svg></button>
+          <button type="button" class="rte-btn" data-cmd="justifyCenter" title="Align center"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2"/><rect x="3.5" y="7" width="9" height="2"/><rect x="2" y="12" width="12" height="2"/></svg></button>
+          <button type="button" class="rte-btn" data-cmd="justifyRight" title="Align right"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2"/><rect x="6" y="7" width="9" height="2"/><rect x="3" y="12" width="12" height="2"/></svg></button>
+          <span class="rte-divider"></span>
           <button type="button" class="rte-btn" data-cmd="insertUnorderedList" title="Bulleted list">•≡</button>
           <button type="button" class="rte-btn" data-cmd="insertOrderedList" title="Numbered list">1≡</button>
+          <span class="rte-divider"></span>
           <button type="button" class="rte-btn image-btn" id="imageBtn" title="Add image">🖼️ Image</button>
           <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
         </div>
@@ -1042,6 +1053,22 @@ document.querySelectorAll('.rte-btn[data-cmd]').forEach(btn => {
   };
 });
 
+/* Plain contenteditable Enter behavior is inconsistent across browsers -- Enter and
+   Shift+Enter can end up looking identical. Force it explicitly: Enter makes a real new
+   paragraph (<p>, spaced via CSS above), Shift+Enter makes a soft line break within one. */
+const postBodyRTE = document.getElementById('postBodyRTE');
+document.execCommand('defaultParagraphSeparator', false, 'p');
+postBodyRTE.addEventListener('focus', () => {
+  document.execCommand('defaultParagraphSeparator', false, 'p');
+});
+postBodyRTE.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && e.shiftKey){
+    e.preventDefault();
+    document.execCommand('insertLineBreak');
+  }
+  // plain Enter falls through to the browser default, which now produces <p> tags
+});
+
 let pendingImageUrl = null;
 document.getElementById('imageBtn').onclick = (e) => {
   e.preventDefault();
@@ -1074,9 +1101,12 @@ document.getElementById('removeImageBtn').onclick = (e) => {
 };
 
 /* Minimal allowlist HTML sanitizer -- used both before saving and before every render,
-   so it protects viewers even if a post reached the table via a route other than this UI. */
+   so it protects viewers even if a post reached the table via a route other than this UI.
+   The only style ever kept is a hand-validated text-align value on P/DIV -- we never copy
+   the original style string, only a value we've checked against a fixed enum ourselves. */
 function sanitizeRichText(html){
   const allowed = ['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN'];
+  const allowedAlign = ['left','center','right','justify'];
   const template = document.createElement('template');
   template.innerHTML = html || '';
   (function clean(node){
@@ -1086,7 +1116,11 @@ function sanitizeRichText(html){
           while(child.firstChild) node.insertBefore(child.firstChild, child);
           node.removeChild(child);
         } else {
+          const align = (child.style && allowedAlign.includes(child.style.textAlign)) ? child.style.textAlign : null;
           while(child.attributes.length > 0) child.removeAttribute(child.attributes[0].name);
+          if(align && (child.tagName === 'P' || child.tagName === 'DIV')){
+            child.setAttribute('style', `text-align:${align}`);
+          }
           clean(child);
         }
       } else if(child.nodeType !== Node.TEXT_NODE){
