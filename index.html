@@ -22,6 +22,18 @@
     --green: #2FA876;
     --radius: 10px;
   }
+  body.dark-mode{
+    --bg: #10141F;
+    --card: #1A2032;
+    --line: #2A3145;
+    --text: #E7E9F0;
+    --text-mute: #A7ACBD;
+    --text-faint: #6E7488;
+    --amber-soft: #3A2F1A;
+  }
+  body.dark-mode{ background:var(--bg); color:var(--text); }
+  body.dark-mode .post-body-rich,
+  body.dark-mode .comment-row .c-body{ color:var(--text-mute); }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     font-family:'Inter', sans-serif;
@@ -125,6 +137,7 @@
     display:flex; align-items:center; justify-content:center;
     font-weight:600; font-size:13px; color:#fff; flex-shrink:0;
   }
+  #myAvatar{cursor:pointer;}
 
   .sidebar{
     grid-area: sidebar; background:var(--navy); color:#fff;
@@ -460,6 +473,44 @@
   .notif-item .title{font-size:12.5px; font-weight:600;}
   .notif-item .body{font-size:11.5px; color:var(--text-mute); margin-top:2px; line-height:1.4;}
   .notif-item .time{font-size:10px; color:var(--text-faint); margin-top:5px; font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- @mentions ---------- */
+  .mention-dropdown{
+    display:none; position:fixed; z-index:200; background:var(--card); border:1px solid var(--line);
+    border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.18); min-width:170px; max-width:240px; overflow:hidden;
+  }
+  .mention-option{padding:8px 12px; font-size:12.5px; cursor:pointer; color:var(--text);}
+  .mention-option:hover{background:var(--bg);}
+  .mention{
+    background:var(--amber-soft); color:#B4740F; padding:1px 5px; border-radius:5px; font-weight:600;
+  }
+
+  /* ---------- Profile panel ---------- */
+  .profile-panel{
+    display:none; position:fixed; top:56px; right:24px; width:260px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25); z-index:90; padding:16px;
+  }
+  .profile-panel.visible{display:block;}
+  .profile-panel-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line);
+  }
+  .profile-panel-name{font-size:13.5px; font-weight:700; color:var(--text);}
+  .profile-panel-email{font-size:11.5px; color:var(--text-faint);}
+  .profile-panel-row{
+    display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:12.5px; color:var(--text-mute);
+  }
+  .switch{position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch-slider{
+    position:absolute; cursor:pointer; inset:0; background:var(--line); border-radius:20px; transition:0.2s;
+  }
+  .switch-slider:before{
+    content:""; position:absolute; height:14px; width:14px; left:3px; bottom:3px;
+    background:#fff; border-radius:50%; transition:0.2s;
+  }
+  .switch input:checked + .switch-slider{background:var(--amber);}
+  .switch input:checked + .switch-slider:before{transform:translateX(16px);}
 </style>
 </head>
 <body>
@@ -611,6 +662,25 @@
     <button class="mark-all-btn" id="markAllReadBtn">Mark all read</button>
   </div>
   <div class="notif-list" id="notifList"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- PROFILE PANEL -->
+<div class="profile-panel" id="profilePanel">
+  <div class="profile-panel-head">
+    <div class="avatar" id="profilePanelAvatar" style="width:38px;height:38px;font-size:14px;">?</div>
+    <div>
+      <div class="profile-panel-name" id="profilePanelName"></div>
+      <div class="profile-panel-email" id="profilePanelEmail"></div>
+    </div>
+  </div>
+  <div class="profile-panel-row">
+    <span>Dark mode</span>
+    <label class="switch"><input type="checkbox" id="darkModeToggle"><span class="switch-slider"></span></label>
+  </div>
+  <div class="profile-panel-row">
+    <span>Allow others to tag me</span>
+    <label class="switch"><input type="checkbox" id="allowTaggingToggle"><span class="switch-slider"></span></label>
+  </div>
 </div>
 
 <!-- ADMIN MODAL -->
@@ -812,13 +882,51 @@ async function boot(){
   cav.textContent = initials(profile.full_name);
   cav.style.background = colorFor(profile.id);
 
+  document.getElementById('profilePanelAvatar').textContent = initials(profile.full_name);
+  document.getElementById('profilePanelAvatar').style.background = colorFor(profile.id);
+  document.getElementById('profilePanelName').textContent = profile.full_name;
+  document.getElementById('profilePanelEmail').textContent = profile.email || '';
+  document.getElementById('darkModeToggle').checked = !!profile.dark_mode;
+  document.getElementById('allowTaggingToggle').checked = profile.allow_tagging !== false;
+  document.body.classList.toggle('dark-mode', !!profile.dark_mode);
+
   applyRoleGating();
   await loadWorkspaceSettings();
   await loadSpaces();
   await loadChannels();
   await loadFeed();
   await loadNotifications();
+  await loadAllMembers();
   subscribeRealtime();
+}
+
+/* ---------------- PROFILE PANEL ---------------- */
+document.getElementById('myAvatar').onclick = (e) => {
+  e.stopPropagation();
+  document.getElementById('profilePanel').classList.toggle('visible');
+};
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('profilePanel');
+  const btn = document.getElementById('myAvatar');
+  if(panel.classList.contains('visible') && !panel.contains(e.target) && !btn.contains(e.target)){
+    panel.classList.remove('visible');
+  }
+});
+document.getElementById('darkModeToggle').onchange = async (e) => {
+  const enabled = e.target.checked;
+  document.body.classList.toggle('dark-mode', enabled);
+  await sb.from('profiles').update({ dark_mode: enabled }).eq('id', currentUser.id);
+};
+document.getElementById('allowTaggingToggle').onchange = async (e) => {
+  await sb.from('profiles').update({ allow_tagging: e.target.checked }).eq('id', currentUser.id);
+  await loadAllMembers();
+};
+
+/* ---------------- MEMBERS LIST (for @mentions) ---------------- */
+let allMembers = [];
+async function loadAllMembers(){
+  const { data } = await sb.from('profiles').select('*').order('full_name');
+  allMembers = (data||[]).filter(m => m.allow_tagging !== false);
 }
 
 /* ---------------- NOTIFICATIONS ---------------- */
@@ -1069,6 +1177,89 @@ postBodyRTE.addEventListener('keydown', (e) => {
   // plain Enter falls through to the browser default, which now produces <p> tags
 });
 
+/* ---------------- @MENTIONS ---------------- */
+const mentionDropdown = document.createElement('div');
+mentionDropdown.className = 'mention-dropdown';
+document.body.appendChild(mentionDropdown);
+
+function findMentionQuery(){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if(!postBodyRTE.contains(range.startContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+  const text = range.startContainer.textContent;
+  const cursorPos = range.startOffset;
+  const uptoCursor = text.slice(0, cursorPos);
+  const atIndex = uptoCursor.lastIndexOf('@');
+  if(atIndex === -1) return null;
+  const query = uptoCursor.slice(atIndex + 1);
+  if(/\s/.test(query)) return null;
+  return { textNode: range.startContainer, atIndex, cursorPos, query };
+}
+
+function hideMentionDropdown(){ mentionDropdown.style.display = 'none'; }
+
+function showMentionDropdown(m){
+  const q = m.query.toLowerCase();
+  const matches = allMembers.filter(mem => mem.full_name.toLowerCase().includes(q)).slice(0, 6);
+  if(!matches.length){ hideMentionDropdown(); return; }
+
+  const sel = window.getSelection();
+  const rect = sel.getRangeAt(0).cloneRange().getBoundingClientRect();
+  mentionDropdown.style.left = Math.max(8, rect.left) + 'px';
+  mentionDropdown.style.top = (rect.bottom + 6) + 'px';
+  mentionDropdown.innerHTML = matches.map(mem =>
+    `<div class="mention-option" data-id="${mem.id}" data-name="${escapeHtml(mem.full_name)}">${escapeHtml(mem.full_name)}</div>`
+  ).join('');
+  mentionDropdown.style.display = 'block';
+
+  mentionDropdown.querySelectorAll('.mention-option').forEach(opt => {
+    opt.onmousedown = (e) => {
+      e.preventDefault();
+      insertMention(m, opt.dataset.id, opt.dataset.name);
+    };
+  });
+}
+
+function insertMention(m, userId, fullName){
+  const textNode = m.textNode;
+  const text = textNode.textContent;
+  const before = text.slice(0, m.atIndex);
+  const after = text.slice(m.cursorPos);
+
+  const mentionSpan = document.createElement('span');
+  mentionSpan.className = 'mention';
+  mentionSpan.contentEditable = 'false';
+  mentionSpan.dataset.user = userId;
+  mentionSpan.textContent = '@' + fullName;
+
+  const parent = textNode.parentNode;
+  const beforeNode = document.createTextNode(before);
+  const afterNode = document.createTextNode('\u00A0' + after);
+  parent.replaceChild(afterNode, textNode);
+  parent.insertBefore(mentionSpan, afterNode);
+  parent.insertBefore(beforeNode, mentionSpan);
+
+  const range = document.createRange();
+  range.setStart(afterNode, 1);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  hideMentionDropdown();
+  postBodyRTE.focus();
+}
+
+postBodyRTE.addEventListener('input', () => {
+  const m = findMentionQuery();
+  if(!m){ hideMentionDropdown(); return; }
+  showMentionDropdown(m);
+});
+document.addEventListener('mousedown', (e) => {
+  if(!mentionDropdown.contains(e.target)) hideMentionDropdown();
+});
+
 let pendingImageUrl = null;
 document.getElementById('imageBtn').onclick = (e) => {
   e.preventDefault();
@@ -1102,11 +1293,13 @@ document.getElementById('removeImageBtn').onclick = (e) => {
 
 /* Minimal allowlist HTML sanitizer -- used both before saving and before every render,
    so it protects viewers even if a post reached the table via a route other than this UI.
-   The only style ever kept is a hand-validated text-align value on P/DIV -- we never copy
-   the original style string, only a value we've checked against a fixed enum ourselves. */
+   Only two things ever survive with attributes: a hand-validated text-align value on P/DIV,
+   and a mention chip whose data-user is checked against a strict UUID shape -- we never
+   copy the original attribute string for either, only a value we've validated ourselves. */
 function sanitizeRichText(html){
   const allowed = ['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN'];
   const allowedAlign = ['left','center','right','justify'];
+  const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   const template = document.createElement('template');
   template.innerHTML = html || '';
   (function clean(node){
@@ -1117,11 +1310,22 @@ function sanitizeRichText(html){
           node.removeChild(child);
         } else {
           const align = (child.style && allowedAlign.includes(child.style.textAlign)) ? child.style.textAlign : null;
+          const isMention = child.tagName === 'SPAN' && child.classList.contains('mention') && uuidPattern.test(child.dataset.user || '');
+          const mentionUserId = isMention ? child.dataset.user : null;
+          const mentionText = isMention ? child.textContent : null;
+
           while(child.attributes.length > 0) child.removeAttribute(child.attributes[0].name);
+
           if(align && (child.tagName === 'P' || child.tagName === 'DIV')){
             child.setAttribute('style', `text-align:${align}`);
           }
-          clean(child);
+          if(isMention){
+            child.setAttribute('class', 'mention');
+            child.setAttribute('data-user', mentionUserId);
+            child.textContent = mentionText; // re-set so no nested markup can hide inside the chip
+          } else {
+            clean(child);
+          }
         }
       } else if(child.nodeType !== Node.TEXT_NODE){
         node.removeChild(child);
