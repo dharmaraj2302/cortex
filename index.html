@@ -229,6 +229,14 @@
   .url-attachment:before{content:"🔗"; flex-shrink:0; font-size:12px;}
   .url-attachment:hover{border-color:var(--amber); background:var(--amber-soft);}
 
+  /* ---------- Read more / post truncation ---------- */
+  .read-more-btn{
+    background:none; border:none; padding:0; margin-top:-2px; margin-bottom:8px;
+    font-size:12.5px; font-weight:700; color:var(--navy);
+    text-decoration:underline; text-underline-offset:2px; cursor:pointer; display:inline-block;
+  }
+  .read-more-btn:hover{color:var(--amber);}
+
   /* ---------- Post footer actions ---------- */
   .post-footer{
     display:flex; align-items:center; gap:6px; flex-wrap:wrap;
@@ -249,6 +257,7 @@
   .footer-action.repost-btn:hover{background:#E7F7EF; color:var(--green);}
   .footer-action.repost-btn.reposted{color:var(--green);}
   .footer-action.repost-btn.reposted:hover{background:#D4F0E1;}
+  .footer-action.share-btn:hover{background:#EFEBFB; color:#8B5CF6;}
   .like-action-group{display:inline-flex; align-items:center;}
   .like-count-link{
     background:none; border:none; font-size:12.5px; color:var(--text-faint);
@@ -482,6 +491,23 @@
     display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-mute); margin-left:8px;
   }
 
+  /* ---------- Post detail modal (Read more) ---------- */
+  .post-detail-modal{width:680px;}
+  .post-detail-modal .admin-tab-content,
+  #postDetailBody{padding:20px 22px; overflow-y:auto; flex:1;}
+  #postDetailBody .post{border:none; padding:0; margin-bottom:0;}
+  #postDetailBody .post::before{display:none;}
+  #postDetailBody .post-footer{cursor:default;}
+
+  /* ---------- Toast ---------- */
+  .app-toast{
+    position:fixed; left:50%; bottom:28px; transform:translate(-50%, 12px);
+    background:var(--navy); color:#fff; font-size:12.5px; font-weight:600;
+    padding:10px 18px; border-radius:30px; box-shadow:0 12px 30px rgba(0,0,0,0.25);
+    opacity:0; pointer-events:none; transition:opacity 0.2s ease, transform 0.2s ease; z-index:300;
+  }
+  .app-toast.visible{opacity:1; transform:translate(-50%, 0);}
+
   /* ---------- Notifications ---------- */
   .notif-badge{
     position:absolute; top:4px; right:4px; min-width:15px; height:15px; border-radius:8px;
@@ -705,6 +731,20 @@
       <button class="close-modal-btn" id="closeLikesModal">×</button>
     </div>
     <div id="likesModalList" style="padding:16px 22px; max-height:360px; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- POST DETAIL MODAL (Read more / full post view) -->
+<div class="modal-overlay" id="postDetailModalOverlay">
+  <div class="admin-modal post-detail-modal">
+    <div class="admin-modal-head">
+      <h2>Post</h2>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button class="footer-action share-btn" id="postDetailShareBtn" title="Share this post" style="color:var(--text-mute);">🔗 Share</button>
+        <button class="close-modal-btn" id="closePostDetailModal">×</button>
+      </div>
+    </div>
+    <div id="postDetailBody"><div class="empty-state">Loading…</div></div>
   </div>
 </div>
 
@@ -941,6 +981,7 @@ async function boot(){
   await loadFeed();
   await loadNotifications();
   subscribeRealtime();
+  openPostFromHash();
 }
 
 /* ---------------- PROFILE PANEL ---------------- */
@@ -1545,7 +1586,11 @@ async function renderFeed(entries){
   attachPostActionHandlers();
 }
 
-async function renderPost(post, repostedBy){
+async function renderPost(post, repostedBy, opts={}){
+  const truncate = opts.truncate !== false;
+  const modal = !!opts.modal;
+  postsRawCache[post.id] = post; // cache raw row so Read more / Share can find it without a refetch
+
   const author = await getProfile(post.author_id);
   const space = spaces.find(s => s.id === post.space_id);
   const tagClass = `tag-${post.type}`;
@@ -1585,6 +1630,42 @@ async function renderPost(post, repostedBy){
     }).join('') + `<div class="poll-total">${total} vote${total!==1?'s':''}</div>`;
   }
 
+  // Body: sanitized rich HTML is always what's stored/trusted. For long posts (>200 words)
+  // in feed context we show a plain-text preview + "Read more" instead of truncating markup
+  // mid-tag. The modal (opts.truncate=false) always gets the full rich body.
+  let bodyBlock = '';
+  if(post.body){
+    const sanitized = sanitizeRichText(post.body);
+    if(truncate){
+      const plain = htmlToPlainText(sanitized).trim();
+      const words = plain.length ? plain.split(/\s+/) : [];
+      if(words.length > 200){
+        const preview = escapeHtml(words.slice(0, 200).join(' ')) + '…';
+        bodyBlock = `<div class="post-body-rich">${preview}</div><button class="read-more-btn" data-post="${post.id}">Read more</button>`;
+      } else {
+        bodyBlock = `<div class="post-body-rich">${sanitized}</div>`;
+      }
+    } else {
+      bodyBlock = `<div class="post-body-rich">${sanitized}</div>`;
+    }
+  }
+
+  const footerHtml = modal
+    ? `<div class="post-footer">
+         <span class="footer-action" style="cursor:default;">${likedByMe?'❤️':'🤍'} ${likeCount} like${likeCount!==1?'s':''}</span>
+         <span class="footer-action" style="cursor:default;">💬 ${commentCount||0} comments</span>
+         <span class="footer-action" style="cursor:default;">🔁 ${repostCount} repost${repostCount!==1?'s':''}</span>
+       </div>`
+    : `<div class="post-footer">
+        <span class="like-action-group">
+          <button class="footer-action like-btn ${likedByMe?'liked':''}" data-post="${post.id}">${likedByMe?'❤️':'🤍'}</button>
+          ${likeCount > 0 ? `<button class="like-count-link" data-post="${post.id}">${likeCount}</button>` : `<span class="like-count-zero">0</span>`}
+        </span>
+        <button class="footer-action comment-toggle-btn" data-post="${post.id}">💬 <span>${commentCount||0} comments</span></button>
+        <button class="footer-action repost-btn ${repostedByMe?'reposted':''}" data-post="${post.id}">🔁 <span>${repostedByMe?'Reposted':'Repost'} · ${repostCount}</span></button>
+        <button class="footer-action share-btn" data-post="${post.id}">🔗 Share</button>
+      </div>`;
+
   return `
     <div class="post">
       ${repostBanner}
@@ -1597,19 +1678,18 @@ async function renderPost(post, repostedBy){
         <span class="post-tag ${tagClass}">${post.type.charAt(0).toUpperCase()+post.type.slice(1)}</span>
       </div>
       <h3>${escapeHtml(post.title)}</h3>
-      ${post.body ? `<div class="post-body-rich">${sanitizeRichText(post.body)}</div>` : ''}
+      ${bodyBlock}
       ${post.image_url ? `<img class="post-image" src="${post.image_url}" alt="">` : ''}
       ${pollHtml}
-      <div class="post-footer">
-        <span class="like-action-group">
-          <button class="footer-action like-btn ${likedByMe?'liked':''}" data-post="${post.id}">${likedByMe?'❤️':'🤍'}</button>
-          ${likeCount > 0 ? `<button class="like-count-link" data-post="${post.id}">${likeCount}</button>` : `<span class="like-count-zero">0</span>`}
-        </span>
-        <button class="footer-action comment-toggle-btn" data-post="${post.id}">💬 <span>${commentCount||0} comments</span></button>
-        <button class="footer-action repost-btn ${repostedByMe?'reposted':''}" data-post="${post.id}">🔁 <span>${repostedByMe?'Reposted':'Repost'} · ${repostCount}</span></button>
-      </div>
-      <div class="comments-section" id="comments-${post.id}"></div>
+      ${footerHtml}
+      ${modal ? '' : `<div class="comments-section" id="comments-${post.id}"></div>`}
     </div>`;
+}
+
+function htmlToPlainText(html){
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  return d.textContent || '';
 }
 
 function attachPostActionHandlers(){
@@ -1643,7 +1723,95 @@ function attachPostActionHandlers(){
   document.querySelectorAll('.like-count-link').forEach(btn => {
     btn.onclick = () => showLikers(btn.dataset.post);
   });
+  document.querySelectorAll('.share-btn[data-post]').forEach(btn => {
+    btn.onclick = () => sharePost(btn.dataset.post);
+  });
+  document.querySelectorAll('.read-more-btn').forEach(btn => {
+    btn.onclick = () => openPostModal(btn.dataset.post);
+  });
 }
+
+/* ---------------- SHARE ---------------- */
+function showToast(msg){
+  let t = document.getElementById('appToast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'appToast';
+    t.className = 'app-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('visible');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove('visible'), 2200);
+}
+
+function postShareUrl(postId){
+  return `${location.origin}${location.pathname}#post-${postId}`;
+}
+
+async function sharePost(postId){
+  const url = postShareUrl(postId);
+  const post = postsRawCache[postId];
+  const shareData = { title: post ? post.title : 'Cortex post', url };
+  try{
+    if(navigator.share){
+      await navigator.share(shareData);
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    showToast('Link copied to clipboard');
+  } catch(err){
+    if(err && err.name === 'AbortError') return; // user cancelled the native share sheet
+    try{
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied to clipboard');
+    } catch(e2){
+      showToast("Couldn't copy link");
+    }
+  }
+}
+
+/* ---------------- POST DETAIL MODAL (Read more) ---------------- */
+let postsRawCache = {};
+
+async function openPostModal(postId){
+  const overlay = document.getElementById('postDetailModalOverlay');
+  const body = document.getElementById('postDetailBody');
+  overlay.classList.add('visible');
+  body.innerHTML = '<div class="empty-state">Loading…</div>';
+  document.getElementById('postDetailShareBtn').dataset.post = postId;
+
+  let post = postsRawCache[postId];
+  if(!post){
+    const { data } = await sb.from('posts').select('*').eq('id', postId).single();
+    post = data;
+  }
+  if(!post){
+    body.innerHTML = '<div class="empty-state">This post is unavailable or may have been removed.</div>';
+    return;
+  }
+
+  body.innerHTML = await renderPost(post, null, { truncate: false, modal: true });
+  attachPollHandlers();
+}
+
+document.getElementById('closePostDetailModal').onclick = () => {
+  document.getElementById('postDetailModalOverlay').classList.remove('visible');
+};
+document.getElementById('postDetailModalOverlay').onclick = (e) => {
+  if(e.target.id === 'postDetailModalOverlay') e.currentTarget.classList.remove('visible');
+};
+document.getElementById('postDetailShareBtn').onclick = () => {
+  const postId = document.getElementById('postDetailShareBtn').dataset.post;
+  if(postId) sharePost(postId);
+};
+
+function openPostFromHash(){
+  const match = location.hash.match(/^#post-(.+)$/);
+  if(match) openPostModal(match[1]);
+}
+window.addEventListener('hashchange', openPostFromHash);
 
 async function showLikers(postId){
   const overlay = document.getElementById('likesModalOverlay');
