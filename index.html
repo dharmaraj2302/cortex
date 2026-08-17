@@ -203,22 +203,31 @@
   .rte-body ul, .rte-body ol{margin-left:20px;}
   .rte-body p, .rte-body div{margin:0 0 8px 0;}
   .rte-body p:last-child, .rte-body div:last-child{margin-bottom:0;}
-  .image-preview-wrap{
-    display:none; align-items:center; gap:10px; margin-bottom:8px;
-    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px;
-  }
-  .image-preview-wrap img{max-height:60px; border-radius:6px;}
-  .image-preview-wrap button{
-    background:none; border:none; color:#C0392B; font-size:12px; margin-left:auto;
-  }
 
-  /* ---------- Post body / image ---------- */
+  /* ---------- Post body: rich content (shared by composer + rendered posts) ---------- */
   .post-body-rich{font-size:13.5px; color:var(--text-mute); line-height:1.6;}
   .post-body-rich ul, .post-body-rich ol{margin-left:20px;}
   .post-body-rich p, .post-body-rich div{margin:0 0 8px 0;}
   .post-body-rich p:last-child, .post-body-rich div:last-child{margin-bottom:0;}
   .post-image{max-width:100%; border-radius:8px; margin-top:10px; display:block;}
   .repost-banner{font-size:11px; color:var(--text-faint); font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:5px;}
+
+  .post-body-rich img, .rte-body img{
+    max-width:100%; border-radius:8px; display:block; margin:8px 0;
+  }
+  .post-body-rich a:not(.url-attachment), .rte-body a:not(.url-attachment){
+    color:var(--navy); font-weight:600; text-decoration:underline; text-underline-offset:2px;
+  }
+  .post-body-rich a:not(.url-attachment):hover, .rte-body a:not(.url-attachment):hover{color:var(--amber);}
+  .url-attachment{
+    display:flex; align-items:center; gap:8px; padding:9px 12px; margin:6px 0;
+    border:1px solid var(--line); border-radius:8px; background:var(--bg);
+    color:var(--navy) !important; font-size:12.5px; font-weight:600;
+    text-decoration:none !important; max-width:100%; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap;
+  }
+  .url-attachment:before{content:"🔗"; flex-shrink:0; font-size:12px;}
+  .url-attachment:hover{border-color:var(--amber); background:var(--amber-soft);}
 
   /* ---------- Post footer actions ---------- */
   .post-footer{
@@ -240,6 +249,14 @@
   .footer-action.repost-btn:hover{background:#E7F7EF; color:var(--green);}
   .footer-action.repost-btn.reposted{color:var(--green);}
   .footer-action.repost-btn.reposted:hover{background:#D4F0E1;}
+  .like-action-group{display:inline-flex; align-items:center;}
+  .like-count-link{
+    background:none; border:none; font-size:12.5px; color:var(--text-faint);
+    cursor:pointer; padding:6px 10px 6px 2px; margin-left:-6px; border-radius:20px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .like-count-link:hover{color:var(--navy); text-decoration:underline;}
+  .like-count-zero{font-size:12.5px; color:var(--text-faint); padding:6px 10px 6px 2px; margin-left:-6px;}
   .comments-section{margin-top:12px; padding-top:12px; border-top:1px solid var(--line); display:none;}
   .comments-list{display:flex; flex-direction:column; gap:10px; margin-bottom:10px;}
   .comment-row{display:flex; gap:8px; align-items:flex-start;}
@@ -629,14 +646,12 @@
           <button type="button" class="rte-btn" data-cmd="insertUnorderedList" title="Bulleted list">•≡</button>
           <button type="button" class="rte-btn" data-cmd="insertOrderedList" title="Numbered list">1≡</button>
           <span class="rte-divider"></span>
-          <button type="button" class="rte-btn image-btn" id="imageBtn" title="Add image">🖼️ Image</button>
+          <button type="button" class="rte-btn" id="linkBtn" title="Insert hyperlink">🔗</button>
+          <button type="button" class="rte-btn image-btn" id="urlAttachBtn" title="Attach a URL">📎 URL</button>
+          <button type="button" class="rte-btn image-btn" id="imageBtn" title="Insert image">🖼️ Image</button>
           <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
         </div>
         <div class="rte-body" id="postBodyRTE" contenteditable="true" data-placeholder="Add details (optional)"></div>
-        <div class="image-preview-wrap" id="imagePreviewWrap">
-          <img id="imagePreviewImg">
-          <button type="button" id="removeImageBtn">Remove</button>
-        </div>
         <div id="pollOptionsWrap" style="display:none;">
           <div class="poll-input-row"><input type="text" class="poll-opt" placeholder="Option 1"></div>
           <div class="poll-input-row"><input type="text" class="poll-opt" placeholder="Option 2"></div>
@@ -680,6 +695,17 @@
     <button class="mark-all-btn" id="markAllReadBtn">Mark all read</button>
   </div>
   <div class="notif-list" id="notifList"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- LIKED BY MODAL -->
+<div class="modal-overlay" id="likesModalOverlay">
+  <div class="admin-modal" style="width:320px;">
+    <div class="admin-modal-head">
+      <h2>Liked by</h2>
+      <button class="close-modal-btn" id="closeLikesModal">×</button>
+    </div>
+    <div id="likesModalList" style="padding:16px 22px; max-height:360px; overflow-y:auto;"></div>
+  </div>
 </div>
 
 <!-- PROFILE PANEL -->
@@ -1292,7 +1318,22 @@ document.addEventListener('mousedown', (e) => {
 attachMentionSupport(postBodyRTE);
 attachMentionSupport(document.getElementById('chatInput'));
 
-let pendingImageUrl = null;
+/* Save a cursor position before an async gap (file upload, a browser prompt() dialog) --
+   focus/selection can be lost during that gap, so we restore it before inserting. */
+function saveCaret(target){
+  const sel = window.getSelection();
+  if(sel.rangeCount && target.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  range.collapse(false);
+  return range;
+}
+function restoreCaret(range){
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 document.getElementById('imageBtn').onclick = (e) => {
   e.preventDefault();
   document.getElementById('imageFileInput').click();
@@ -1300,6 +1341,7 @@ document.getElementById('imageBtn').onclick = (e) => {
 document.getElementById('imageFileInput').onchange = async (e) => {
   const file = e.target.files[0];
   if(!file) return;
+  const savedRange = saveCaret(postBodyRTE);
   const btn = document.getElementById('imageBtn');
   btn.textContent = 'Uploading…';
   try{
@@ -1307,31 +1349,84 @@ document.getElementById('imageFileInput').onchange = async (e) => {
     const { error } = await sb.storage.from('post-images').upload(path, file);
     if(error) throw error;
     const { data } = sb.storage.from('post-images').getPublicUrl(path);
-    pendingImageUrl = data.publicUrl;
-    document.getElementById('imagePreviewImg').src = pendingImageUrl;
-    document.getElementById('imagePreviewWrap').style.display = 'flex';
+
+    restoreCaret(savedRange);
+    const img = document.createElement('img');
+    img.src = data.publicUrl;
+    img.alt = '';
+    savedRange.deleteContents();
+    savedRange.insertNode(img);
+    savedRange.setStartAfter(img);
+    savedRange.collapse(true);
+    restoreCaret(savedRange);
   } catch(err){
     alert('Image upload failed: ' + err.message);
   } finally {
     btn.textContent = '🖼️ Image';
     e.target.value = '';
+    postBodyRTE.focus();
   }
 };
-document.getElementById('removeImageBtn').onclick = (e) => {
+
+document.getElementById('linkBtn').onclick = (e) => {
   e.preventDefault();
-  pendingImageUrl = null;
-  document.getElementById('imagePreviewWrap').style.display = 'none';
+  const savedRange = saveCaret(postBodyRTE);
+  const selectedText = savedRange.toString();
+  const url = prompt('Link URL (https://…)');
+  if(!url || !url.trim()) return;
+  const trimmed = url.trim();
+  if(!/^https?:\/\//i.test(trimmed)){ alert('Links must start with http:// or https://'); return; }
+  const linkText = selectedText || prompt('Link text', trimmed) || trimmed;
+
+  restoreCaret(savedRange);
+  const a = document.createElement('a');
+  a.href = trimmed;
+  a.textContent = linkText;
+  savedRange.deleteContents();
+  savedRange.insertNode(a);
+  savedRange.setStartAfter(a);
+  savedRange.collapse(true);
+  restoreCaret(savedRange);
+  postBodyRTE.focus();
+};
+
+document.getElementById('urlAttachBtn').onclick = (e) => {
+  e.preventDefault();
+  const savedRange = saveCaret(postBodyRTE);
+  const url = prompt('URL to attach (https://…)');
+  if(!url || !url.trim()) return;
+  const trimmed = url.trim();
+  if(!/^https?:\/\//i.test(trimmed)){ alert('URLs must start with http:// or https://'); return; }
+  let label = trimmed;
+  try{ label = new URL(trimmed).hostname.replace(/^www\./,''); } catch(err){}
+
+  restoreCaret(savedRange);
+  const a = document.createElement('a');
+  a.href = trimmed;
+  a.className = 'url-attachment';
+  a.textContent = label;
+  savedRange.deleteContents();
+  savedRange.insertNode(a);
+  savedRange.setStartAfter(a);
+  savedRange.collapse(true);
+  restoreCaret(savedRange);
+  document.execCommand('insertParagraph');
+  postBodyRTE.focus();
 };
 
 /* Minimal allowlist HTML sanitizer -- used both before saving and before every render,
    so it protects viewers even if a post reached the table via a route other than this UI.
-   Only two things ever survive with attributes: a hand-validated text-align value on P/DIV,
-   and a mention chip whose data-user is checked against a strict UUID shape -- we never
-   copy the original attribute string for either, only a value we've validated ourselves. */
+   Attributes only ever survive in four hand-validated cases: a text-align value on P/DIV,
+   a mention chip's data-user checked against a strict UUID shape, an IMG src checked against
+   our own storage bucket's URL prefix (so this can't be used to load a third-party tracking
+   pixel), and an A href checked to start with http(s) (so javascript:/data: URLs are rejected).
+   We never copy the original attribute string in any of these cases, only a value we've
+   validated ourselves, and target/rel on links are always set fresh, never taken from input. */
 function sanitizeRichText(html){
-  const allowed = ['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN'];
+  const allowed = ['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN','A','IMG'];
   const allowedAlign = ['left','center','right','justify'];
   const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const ownImagePrefix = `${SUPABASE_URL}/storage/v1/object/public/post-images/`;
   const template = document.createElement('template');
   template.innerHTML = html || '';
   (function clean(node){
@@ -1340,6 +1435,31 @@ function sanitizeRichText(html){
         if(!allowed.includes(child.tagName)){
           while(child.firstChild) node.insertBefore(child.firstChild, child);
           node.removeChild(child);
+        } else if(child.tagName === 'IMG'){
+          const src = child.getAttribute('src') || '';
+          while(child.attributes.length > 0) child.removeAttribute(child.attributes[0].name);
+          if(src.startsWith(ownImagePrefix)){
+            child.setAttribute('src', src);
+            child.setAttribute('alt', '');
+          } else {
+            node.removeChild(child); // not an image we generated ourselves -- drop it
+          }
+        } else if(child.tagName === 'A'){
+          const href = child.getAttribute('href') || '';
+          const isUrlAttachment = child.classList.contains('url-attachment');
+          const linkText = child.textContent;
+          const validHref = /^https?:\/\//i.test(href);
+          while(child.attributes.length > 0) child.removeAttribute(child.attributes[0].name);
+          if(validHref){
+            child.setAttribute('href', href);
+            child.setAttribute('target', '_blank');
+            child.setAttribute('rel', 'noopener noreferrer');
+            if(isUrlAttachment) child.setAttribute('class', 'url-attachment');
+            child.textContent = linkText;
+          } else {
+            while(child.firstChild) node.insertBefore(child.firstChild, child);
+            node.removeChild(child);
+          }
         } else {
           const align = (child.style && allowedAlign.includes(child.style.textAlign)) ? child.style.textAlign : null;
           const isMention = child.tagName === 'SPAN' && child.classList.contains('mention') && uuidPattern.test(child.dataset.user || '');
@@ -1377,7 +1497,7 @@ document.getElementById('postSubmitBtn').onclick = async () => {
   if(!title) return;
 
   const { data: post, error } = await sb.from('posts').insert({
-    space_id: spaceId, author_id: currentUser.id, type, title, body, image_url: pendingImageUrl
+    space_id: spaceId, author_id: currentUser.id, type, title, body
   }).select().single();
   if(error){ console.error(error); return; }
 
@@ -1390,8 +1510,6 @@ document.getElementById('postSubmitBtn').onclick = async () => {
 
   document.getElementById('postTitleInput').value = '';
   document.getElementById('postBodyRTE').innerHTML = '';
-  pendingImageUrl = null;
-  document.getElementById('imagePreviewWrap').style.display = 'none';
   document.querySelectorAll('.poll-opt').forEach(i => i.value = '');
   document.getElementById('composerExtra').classList.remove('visible');
   document.getElementById('pollOptionsWrap').style.display = 'none';
@@ -1483,7 +1601,10 @@ async function renderPost(post, repostedBy){
       ${post.image_url ? `<img class="post-image" src="${post.image_url}" alt="">` : ''}
       ${pollHtml}
       <div class="post-footer">
-        <button class="footer-action like-btn ${likedByMe?'liked':''}" data-post="${post.id}">${likedByMe?'❤️':'🤍'} <span>${likeCount}</span></button>
+        <span class="like-action-group">
+          <button class="footer-action like-btn ${likedByMe?'liked':''}" data-post="${post.id}">${likedByMe?'❤️':'🤍'}</button>
+          ${likeCount > 0 ? `<button class="like-count-link" data-post="${post.id}">${likeCount}</button>` : `<span class="like-count-zero">0</span>`}
+        </span>
         <button class="footer-action comment-toggle-btn" data-post="${post.id}">💬 <span>${commentCount||0} comments</span></button>
         <button class="footer-action repost-btn ${repostedByMe?'reposted':''}" data-post="${post.id}">🔁 <span>${repostedByMe?'Reposted':'Repost'} · ${repostCount}</span></button>
       </div>
@@ -1519,7 +1640,34 @@ function attachPostActionHandlers(){
   document.querySelectorAll('.comment-toggle-btn').forEach(btn => {
     btn.onclick = () => toggleComments(btn.dataset.post);
   });
+  document.querySelectorAll('.like-count-link').forEach(btn => {
+    btn.onclick = () => showLikers(btn.dataset.post);
+  });
 }
+
+async function showLikers(postId){
+  const overlay = document.getElementById('likesModalOverlay');
+  const list = document.getElementById('likesModalList');
+  list.innerHTML = '<div class="empty-state">Loading…</div>';
+  overlay.classList.add('visible');
+
+  const { data: likes } = await sb.from('post_likes').select('user_id').eq('post_id', postId);
+  if(!likes || !likes.length){ list.innerHTML = '<div class="empty-state">No likes yet.</div>'; return; }
+
+  const rows = await Promise.all(likes.map(async l => {
+    const p = await getProfile(l.user_id);
+    return `
+      <div class="member-row">
+        <div class="avatar" style="width:30px;height:30px;font-size:11.5px;background:${colorFor(p.id)};">${initials(p.full_name)}</div>
+        <div class="member-info"><div class="name">${escapeHtml(p.full_name)}</div></div>
+      </div>`;
+  }));
+  list.innerHTML = rows.join('');
+}
+document.getElementById('closeLikesModal').onclick = () => document.getElementById('likesModalOverlay').classList.remove('visible');
+document.getElementById('likesModalOverlay').onclick = (e) => {
+  if(e.target.id === 'likesModalOverlay') e.currentTarget.classList.remove('visible');
+};
 
 async function toggleComments(postId){
   const section = document.getElementById('comments-' + postId);
