@@ -34,6 +34,29 @@
   body.dark-mode{ background:var(--bg); color:var(--text); }
   body.dark-mode .post-body-rich,
   body.dark-mode .comment-row .c-body{ color:var(--text-mute); }
+  /* Plain <input>/<select> elements don't inherit the theme variables the way divs do --
+     without this they keep the browser's native white background + black text even
+     when the rest of the UI has switched to dark mode (composer dropdowns, poll option
+     fields, admin modal fields, etc). The search bar and the pre-login auth fields are
+     deliberately excluded/reasserted below since they already have their own styling. */
+  body.dark-mode select,
+  body.dark-mode input[type="text"],
+  body.dark-mode input[type="email"],
+  body.dark-mode input[type="password"],
+  body.dark-mode input[type="color"]{
+    background:var(--card);
+    color:var(--text);
+    border-color:var(--line);
+  }
+  body.dark-mode input[type="text"]::placeholder,
+  body.dark-mode input[type="email"]::placeholder,
+  body.dark-mode input[type="password"]::placeholder{
+    color:var(--text-faint);
+  }
+  body.dark-mode .search input{
+    background:rgba(255,255,255,0.08);
+    color:#fff;
+  }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     font-family:'Inter', sans-serif;
@@ -258,6 +281,8 @@
   .footer-action.repost-btn.reposted{color:var(--green);}
   .footer-action.repost-btn.reposted:hover{background:#D4F0E1;}
   .footer-action.share-btn:hover{background:#EFEBFB; color:#8B5CF6;}
+  .footer-action.delete-post-btn{margin-left:auto;}
+  .footer-action.delete-post-btn:hover{background:#FDE9E9; color:#C0392B;}
   .like-action-group{display:inline-flex; align-items:center;}
   .like-count-link{
     background:none; border:none; font-size:12.5px; color:var(--text-faint);
@@ -1664,6 +1689,7 @@ async function renderPost(post, repostedBy, opts={}){
         <button class="footer-action comment-toggle-btn" data-post="${post.id}">💬 <span>${commentCount||0} comments</span></button>
         <button class="footer-action repost-btn ${repostedByMe?'reposted':''}" data-post="${post.id}">🔁 <span>${repostedByMe?'Reposted':'Repost'} · ${repostCount}</span></button>
         <button class="footer-action share-btn" data-post="${post.id}">🔗 Share</button>
+        ${(post.author_id === currentUser.id || currentUserRole === 'admin') ? `<button class="footer-action delete-post-btn" data-post="${post.id}" title="Delete post">🗑</button>` : ''}
       </div>`;
 
   return `
@@ -1728,6 +1754,14 @@ function attachPostActionHandlers(){
   });
   document.querySelectorAll('.read-more-btn').forEach(btn => {
     btn.onclick = () => openPostModal(btn.dataset.post);
+  });
+  document.querySelectorAll('.delete-post-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if(!confirm('Delete this post? This cannot be undone.')) return;
+      const { error } = await sb.from('posts').delete().eq('id', btn.dataset.post);
+      if(error){ alert('Could not delete: ' + error.message); return; }
+      await loadFeed();
+    };
   });
 }
 
