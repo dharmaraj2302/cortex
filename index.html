@@ -1656,7 +1656,30 @@ function sanitizeRichText(html){
             clean(child);
           }
         }
-      } else if(child.nodeType !== Node.TEXT_NODE){
+      } else if(child.nodeType === Node.TEXT_NODE){
+        const text = child.textContent;
+        if(node.tagName !== 'A' && /https?:\/\/[^\s]+/.test(text)){
+          const urlRegex = /(https?:\/\/[^\s]+)/g;
+          let lastIndex = 0;
+          let match;
+          while((match = urlRegex.exec(text)) !== null) {
+            if(match.index > lastIndex) {
+              node.insertBefore(document.createTextNode(text.substring(lastIndex, match.index)), child);
+            }
+            const a = document.createElement('a');
+            a.href = match[0];
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = match[0];
+            node.insertBefore(a, child);
+            lastIndex = urlRegex.lastIndex;
+          }
+          if(lastIndex < text.length) {
+            node.insertBefore(document.createTextNode(text.substring(lastIndex)), child);
+          }
+          node.removeChild(child);
+        }
+      } else {
         node.removeChild(child);
       }
     });
