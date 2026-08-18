@@ -66,6 +66,39 @@
     background: rgba(192,57,43,0.22);
     color: #FF7A6E;
   }
+
+  /* ---------- Dark-mode accent-text fixes ----------
+     Several rules elsewhere in this file use var(--navy) as an "accent" text color
+     (active tab labels, links, read-more, hover states). That works in light mode
+     because navy-on-white is high contrast, but --navy is never redefined for dark
+     mode above, and the two dark-mode surface colors (--bg, --card) are themselves
+     navy-toned -- so navy text on top of them is nearly invisible. Reroute all of
+     those accent-text usages to --amber in dark mode, which is already the hover/
+     active accent everywhere else, so this stays visually consistent rather than
+     introducing a new color. The .url-attachment rule uses !important elsewhere to
+     win over the general link-color rule, so it needs a matching !important override
+     here to actually take effect. */
+  body.dark-mode .footer-action:hover,
+  body.dark-mode .channel-tab.active,
+  body.dark-mode .admin-tab.active,
+  body.dark-mode .read-more-btn,
+  body.dark-mode .read-more-btn:hover,
+  body.dark-mode .like-count-link:hover,
+  body.dark-mode .comment-mini-btn:hover,
+  body.dark-mode .access-btn:hover,
+  body.dark-mode .mark-all-btn:hover,
+  body.dark-mode .post-body-rich a:not(.url-attachment),
+  body.dark-mode .rte-body a:not(.url-attachment){
+    color: var(--amber);
+  }
+  body.dark-mode .url-attachment{
+    color: var(--amber) !important;
+    background: var(--card);
+  }
+  body.dark-mode .url-attachment:hover{
+    background: var(--amber-soft);
+  }
+
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     font-family:'Inter', sans-serif;
