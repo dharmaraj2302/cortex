@@ -57,6 +57,15 @@
     background:rgba(255,255,255,0.08);
     color:#fff;
   }
+  /* Plain checkboxes (broadcast toggle, admin-only toggle, visibility-panel role
+     checkboxes) are native form controls the OS renders with its own light theme --
+     accent-color re-themes the check itself without needing a background hack, and
+     works the same in light mode so this isn't dark-mode-only. */
+  input[type="checkbox"]{ accent-color: var(--amber); }
+  body.dark-mode .broadcast-badge{
+    background: rgba(192,57,43,0.22);
+    color: #FF7A6E;
+  }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
     font-family:'Inter', sans-serif;
