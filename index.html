@@ -1825,8 +1825,9 @@ async function renderPost(post, repostedBy, opts={}){
 
 function htmlToPlainText(html){
   const d = document.createElement('div');
-  d.innerHTML = html || '';
-  return d.textContent || '';
+  // Ensure spacing between block elements and breaks before extracting text
+  d.innerHTML = (html || '').replace(/<\/(p|div|h[1-6]|li)>/ig, ' </$1>').replace(/<br\s*\/?>/ig, ' ');
+  return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 function attachPostActionHandlers(){
