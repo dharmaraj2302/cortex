@@ -597,6 +597,15 @@
   }
   .switch input:checked + .switch-slider{background:var(--amber);}
   .switch input:checked + .switch-slider:before{transform:translateX(16px);}
+
+  /* ---------- Comment threads / replies / likes ---------- */
+  .comment-thread{margin-left:32px; margin-top:8px; display:flex; flex-direction:column; gap:10px;}
+  .comment-actions-row{display:flex; gap:12px; margin-top:4px;}
+  .comment-mini-btn{background:none; border:none; font-size:11px; color:var(--text-faint); cursor:pointer; padding:0;}
+  .comment-mini-btn:hover{color:var(--navy);}
+  .comment-mini-btn.liked{color:#C0392B;}
+  .comment-mini-btn.delete-comment-btn:hover{color:#C0392B;}
+  .comment-reply-input-row{display:flex; gap:6px; margin-top:8px;}
 </style>
 </head>
 <body>
@@ -1758,8 +1767,9 @@ function attachPostActionHandlers(){
   document.querySelectorAll('.delete-post-btn').forEach(btn => {
     btn.onclick = async () => {
       if(!confirm('Delete this post? This cannot be undone.')) return;
-      const { error } = await sb.from('posts').delete().eq('id', btn.dataset.post);
+      const { data, error } = await sb.from('posts').delete().eq('id', btn.dataset.post).select();
       if(error){ alert('Could not delete: ' + error.message); return; }
+      if(!data || !data.length){ alert('Nothing was deleted — check that the delete RLS policy on posts covers this user.'); return; }
       await loadFeed();
     };
   });
@@ -1871,6 +1881,7 @@ document.getElementById('likesModalOverlay').onclick = (e) => {
   if(e.target.id === 'likesModalOverlay') e.currentTarget.classList.remove('visible');
 };
 
+/* ---------------- COMMENTS: threads, likes, replies, delete ---------------- */
 async function toggleComments(postId){
   const section = document.getElementById('comments-' + postId);
   if(section.style.display === 'block'){ section.style.display = 'none'; return; }
@@ -1878,35 +1889,123 @@ async function toggleComments(postId){
   section.innerHTML = '<div class="empty-state">Loading…</div>';
 
   const { data: cmts } = await sb.from('comments').select('*').eq('post_id', postId).order('created_at', { ascending: true });
-  const rows = await Promise.all((cmts||[]).map(async c => {
-    const author = await getProfile(c.author_id);
-    return `
-      <div class="comment-row">
-        <div class="avatar" style="width:24px;height:24px;font-size:10px;background:${colorFor(author.id)};">${initials(author.full_name)}</div>
-        <div>
-          <span class="c-name">${escapeHtml(author.full_name)}</span> <span class="c-time mono">${timeAgo(c.created_at)}</span>
-          <div class="c-body">${sanitizeRichText(c.body)}</div>
-        </div>
-      </div>`;
-  }));
+  const ids = (cmts||[]).map(c => c.id);
+  const { data: likeRows } = ids.length
+    ? await sb.from('comment_likes').select('comment_id, user_id').in('comment_id', ids)
+    : { data: [] };
+
+  const likesByComment = {};
+  (likeRows||[]).forEach(l => {
+    (likesByComment[l.comment_id] ||= []).push(l.user_id);
+  });
+
+  const byParent = {};
+  (cmts||[]).forEach(c => {
+    const key = c.parent_comment_id || 'root';
+    (byParent[key] ||= []).push(c);
+  });
 
   const canComment = ROLE_LEVEL[currentUserRole] >= ROLE_LEVEL.contributor;
-  section.innerHTML = `<div class="comments-list">${rows.join('') || '<div class="empty-state">No comments yet.</div>'}</div>` +
+
+  async function renderNode(c){
+    const author = await getProfile(c.author_id);
+    const likes = likesByComment[c.id] || [];
+    const likedByMe = likes.includes(currentUser.id);
+    const children = byParent[c.id] || [];
+    const childrenHtml = (await Promise.all(children.map(renderNode))).join('');
+    const canDelete = c.author_id === currentUser.id || currentUserRole === 'admin';
+
+    return `
+      <div class="comment-row" data-comment="${c.id}">
+        <div class="avatar" style="width:24px;height:24px;font-size:10px;background:${colorFor(author.id)};">${initials(author.full_name)}</div>
+        <div style="flex:1; min-width:0;">
+          <span class="c-name">${escapeHtml(author.full_name)}</span> <span class="c-time mono">${timeAgo(c.created_at)}</span>
+          <div class="c-body">${sanitizeRichText(c.body)}</div>
+          <div class="comment-actions-row">
+            <button class="comment-mini-btn comment-like-btn ${likedByMe?'liked':''}" data-comment="${c.id}">${likedByMe?'❤️':'🤍'} ${likes.length||''}</button>
+            ${canComment ? `<button class="comment-mini-btn comment-reply-btn" data-comment="${c.id}">Reply</button>` : ''}
+            ${canDelete ? `<button class="comment-mini-btn delete-comment-btn" data-comment="${c.id}">Delete</button>` : ''}
+          </div>
+          <div class="comment-reply-slot" id="reply-slot-${c.id}"></div>
+          ${childrenHtml ? `<div class="comment-thread">${childrenHtml}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  const roots = byParent['root'] || [];
+  const rows = (await Promise.all(roots.map(renderNode))).join('');
+
+  section.innerHTML = `<div class="comments-list">${rows || '<div class="empty-state">No comments yet.</div>'}</div>` +
     (canComment ? `<div class="comment-input-row"><div class="editable-field comment-input" contenteditable="true" data-placeholder="Write a comment…"></div><button class="comment-send-btn">Send</button></div>` : '');
 
-  if(canComment){
-    const input = section.querySelector('.comment-input');
-    attachMentionSupport(input);
+  attachCommentHandlers(section, postId);
+
+  const topInput = section.querySelector('.comment-input-row .comment-input');
+  if(topInput){
+    attachMentionSupport(topInput);
+    const sendBtn = section.querySelector('.comment-input-row .comment-send-btn');
     const send = async () => {
-      if(!input.textContent.trim()) return;
-      const body = sanitizeRichText(input.innerHTML.trim());
-      await sb.from('comments').insert({ post_id: postId, author_id: currentUser.id, body });
+      if(!topInput.textContent.trim()) return;
+      const body = sanitizeRichText(topInput.innerHTML.trim());
+      await sb.from('comments').insert({ post_id: postId, author_id: currentUser.id, body, parent_comment_id: null });
       section.style.display = 'none';
       await toggleComments(postId);
     };
-    section.querySelector('.comment-send-btn').onclick = send;
-    input.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+    sendBtn.onclick = send;
+    topInput.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
   }
+}
+
+function attachCommentHandlers(section, postId){
+  section.querySelectorAll('.comment-like-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const commentId = btn.dataset.comment;
+      const { data: existing } = await sb.from('comment_likes').select('*').eq('comment_id', commentId).eq('user_id', currentUser.id);
+      if(existing && existing.length){
+        await sb.from('comment_likes').delete().eq('id', existing[0].id);
+      } else {
+        await sb.from('comment_likes').insert({ comment_id: commentId, user_id: currentUser.id });
+      }
+      section.style.display = 'none';
+      await toggleComments(postId);
+    };
+  });
+
+  section.querySelectorAll('.comment-reply-btn').forEach(btn => {
+    btn.onclick = () => {
+      const commentId = btn.dataset.comment;
+      const slot = document.getElementById('reply-slot-' + commentId);
+      if(slot.innerHTML){ slot.innerHTML = ''; return; }
+      section.querySelectorAll('.comment-reply-slot').forEach(s => s.innerHTML = '');
+      slot.innerHTML = `<div class="comment-reply-input-row">
+        <div class="editable-field reply-input" contenteditable="true" data-placeholder="Write a reply…"></div>
+        <button class="comment-send-btn reply-send-btn">Send</button>
+      </div>`;
+      const input = slot.querySelector('.reply-input');
+      attachMentionSupport(input);
+      const send = async () => {
+        if(!input.textContent.trim()) return;
+        const body = sanitizeRichText(input.innerHTML.trim());
+        await sb.from('comments').insert({ post_id: postId, author_id: currentUser.id, body, parent_comment_id: commentId });
+        section.style.display = 'none';
+        await toggleComments(postId);
+      };
+      slot.querySelector('.reply-send-btn').onclick = send;
+      input.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+      input.focus();
+    };
+  });
+
+  section.querySelectorAll('.delete-comment-btn').forEach(btn => {
+    btn.onclick = async () => {
+      if(!confirm('Delete this comment? Replies to it will be deleted too.')) return;
+      const { data, error } = await sb.from('comments').delete().eq('id', btn.dataset.comment).select();
+      if(error){ alert('Could not delete: ' + error.message); return; }
+      if(!data || !data.length){ alert('Nothing was deleted — check RLS policy.'); return; }
+      section.style.display = 'none';
+      await toggleComments(postId);
+    };
+  });
 }
 
 function attachPollHandlers(){
