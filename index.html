@@ -88,8 +88,31 @@
   body.dark-mode .access-btn:hover,
   body.dark-mode .mark-all-btn:hover,
   body.dark-mode .post-body-rich a:not(.url-attachment),
-  body.dark-mode .rte-body a:not(.url-attachment){
+  body.dark-mode .rte-body a:not(.url-attachment),
+  body.dark-mode .rte-btn:hover,
+  body.dark-mode .chip-btn:hover,
+  body.dark-mode .add-option-btn:hover{
+    color: var(--amber) !important;
+  }
+  body.dark-mode .rte-btn{
+    background: var(--bg);
+    border-color: var(--line);
+    color: var(--text-mute);
+  }
+  body.dark-mode .chip-btn{
+    background: var(--bg);
+    border-color: var(--line);
+    color: var(--text-mute);
+  }
+  body.dark-mode .chip-btn.active{
+    border-color: var(--amber);
+    background: var(--amber-soft);
     color: var(--amber);
+  }
+  body.dark-mode .composer-submit,
+  body.dark-mode .comment-send-btn{
+    background: var(--amber);
+    color: #1A1A1A;
   }
   body.dark-mode .url-attachment{
     color: var(--amber) !important;
@@ -232,7 +255,7 @@
   }
   .composer-row{display:flex; gap:12px; align-items:center;}
   .composer input[type=text]{
-    flex:1; border:none; outline:none; font-size:14px; color:var(--text);
+    flex:1; border:none; outline:none; font-size:14px; color:var(--text); background:transparent;
   }
   .composer .actions{display:flex; gap:8px;}
   .chip-btn{
@@ -262,6 +285,7 @@
     width:100%; min-height:60px; max-height:220px; overflow-y:auto;
     border:1px solid var(--line); border-radius:7px; padding:9px 11px;
     font-size:13px; margin-bottom:8px; outline:none; line-height:1.5;
+    background:transparent; color:var(--text);
   }
   .rte-body:focus{border-color:var(--amber);}
   .rte-body:empty:before{content: attr(data-placeholder); color:var(--text-faint);}
@@ -648,6 +672,26 @@
   .comment-mini-btn.liked{color:#C0392B;}
   .comment-mini-btn.delete-comment-btn:hover{color:#C0392B;}
   .comment-reply-input-row{display:flex; gap:6px; margin-top:8px;}
+
+  /* ---------- Dark-mode: footer action hover backgrounds ---------- */
+  body.dark-mode .footer-action.like-btn:hover{background:rgba(192,57,43,0.15);}
+  body.dark-mode .footer-action.like-btn.liked:hover{background:rgba(192,57,43,0.2);}
+  body.dark-mode .footer-action.comment-toggle-btn:hover{background:rgba(52,87,213,0.12);}
+  body.dark-mode .footer-action.repost-btn:hover{background:rgba(47,168,118,0.12);}
+  body.dark-mode .footer-action.repost-btn.reposted:hover{background:rgba(47,168,118,0.18);}
+  body.dark-mode .footer-action.share-btn:hover{background:rgba(139,92,246,0.12);}
+  body.dark-mode .footer-action.delete-post-btn:hover{background:rgba(192,57,43,0.15);}
+  body.dark-mode .footer-action:hover{background:rgba(255,255,255,0.06);}
+
+  /* ---------- Dark-mode: scrollbar ---------- */
+  body.dark-mode ::-webkit-scrollbar-thumb{background:#3A4058;}
+
+  /* ---------- Dark-mode: editable fields (comment/reply/chat inputs) ---------- */
+  body.dark-mode .editable-field{
+    background:var(--bg);
+    color:var(--text);
+    border-color:var(--line);
+  }
 </style>
 </head>
 <body>
