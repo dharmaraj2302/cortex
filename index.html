@@ -21,6 +21,8 @@
     --text-faint: #9AA0B4;
     --green: #2FA876;
     --radius: 10px;
+    --font-heading: 'Sora', sans-serif;
+    --font-body: 'Inter', sans-serif;
   }
   body.dark-mode{
     --bg: #10141F;
@@ -125,12 +127,12 @@
 
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
-    font-family:'Inter', sans-serif;
+    font-family:var(--font-body);
     background:var(--bg);
     color:var(--text);
     -webkit-font-smoothing:antialiased;
   }
-  h1,h2,h3,.brand,.nav-section-title{font-family:'Sora', sans-serif;}
+  h1,h2,h3,.brand,.nav-section-title{font-family:var(--font-heading);}
   .mono{font-family:'IBM Plex Mono', monospace;}
   button{font-family:inherit; cursor:pointer;}
   input{font-family:inherit;}
@@ -724,7 +726,13 @@
     font-size:13px; outline:none; background:var(--card); color:var(--text);
   }
   .settings-field input[type=text]:focus{border-color:var(--amber);}
-  .color-row{display:flex; gap:18px;}
+  .settings-field select{
+    width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; outline:none; background:var(--card); color:var(--text);
+  }
+  .settings-field select:focus{border-color:var(--amber);}
+  .settings-field .field-note{font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.4;}
+  .color-row{display:flex; gap:18px; flex-wrap:wrap;}
   .color-field{display:flex; align-items:center; gap:8px;}
   .color-field input[type=color]{
     width:38px; height:38px; padding:2px; border-radius:8px; border:1px solid var(--line); cursor:pointer;
@@ -1134,6 +1142,24 @@
         <div class="settings-field"><label>Workspace name</label><input type="text" id="wsName"></div>
         <div class="settings-field"><label>Tagline</label><input type="text" id="wsTagline"></div>
         <div class="settings-field"><label>Branding colors</label><div class="color-row"><div class="color-field"><input type="color" id="wsPrimary"><span>Primary</span></div><div class="color-field"><input type="color" id="wsAccent"><span>Accent</span></div></div></div>
+        <div class="settings-field">
+          <label>Interface colors</label>
+          <div class="color-row">
+            <div class="color-field"><input type="color" id="wsBg"><span>Background</span></div>
+            <div class="color-field"><input type="color" id="wsCard"><span>Cards & surfaces</span></div>
+            <div class="color-field"><input type="color" id="wsText"><span>Text</span></div>
+          </div>
+          <div class="field-note">Dark mode keeps its own built-in palette regardless of these — this only affects light mode.</div>
+        </div>
+        <div class="settings-field">
+          <label>Heading font</label>
+          <select id="wsHeadingFont"></select>
+        </div>
+        <div class="settings-field">
+          <label>Body font</label>
+          <select id="wsBodyFont"></select>
+          <div class="field-note">Changes preview instantly. Click Save to apply for everyone in the workspace.</div>
+        </div>
         <button class="save-settings-btn" id="saveWorkspaceBtn">Save changes</button><span class="save-toast" id="wsSaveToast">Saved ✓</span>
       </div>
     </section>
@@ -2314,6 +2340,81 @@ function attachPollHandlers(){
   });
 }
 
+/* ---------------- WORKSPACE SETTINGS: theme (colors + fonts) ---------------- */
+/* Curated Google Fonts lists -- kept short and legible-at-a-glance rather than
+   exhaustive. Sora/Inter are already preloaded via the <link> tag in <head>, so
+   they're marked pre-loaded and never re-fetched. Anything else is lazy-loaded
+   the first time it's actually selected (either from saved settings or by the
+   admin trying it in the picker), via ensureFontLoaded below. */
+const HEADING_FONTS = [
+  { name:'Sora', google:'Sora:wght@400;600;700;800' },
+  { name:'Poppins', google:'Poppins:wght@400;600;700;800' },
+  { name:'Playfair Display', google:'Playfair+Display:wght@400;600;700;800' },
+  { name:'Space Grotesk', google:'Space+Grotesk:wght@400;600;700' },
+  { name:'Fraunces', google:'Fraunces:wght@400;600;700;800' },
+  { name:'DM Serif Display', google:'DM+Serif+Display:wght@400' },
+  { name:'Outfit', google:'Outfit:wght@400;600;700;800' },
+  { name:'Manrope', google:'Manrope:wght@400;600;700;800' }
+];
+const BODY_FONTS = [
+  { name:'Inter', google:'Inter:wght@400;500;600' },
+  { name:'Roboto', google:'Roboto:wght@400;500;700' },
+  { name:'Work Sans', google:'Work+Sans:wght@400;500;600' },
+  { name:'Nunito Sans', google:'Nunito+Sans:wght@400;600;700' },
+  { name:'Source Sans 3', google:'Source+Sans+3:wght@400;500;600' },
+  { name:'Karla', google:'Karla:wght@400;500;700' },
+  { name:'IBM Plex Sans', google:'IBM+Plex+Sans:wght@400;500;600' },
+  { name:'Manrope', google:'Manrope:wght@400;500;600' }
+];
+const loadedFonts = new Set(['Sora', 'Inter']); // already in the <head> <link>
+
+function ensureFontLoaded(fontName, list){
+  if(loadedFonts.has(fontName)) return;
+  const entry = list.find(f => f.name === fontName);
+  if(!entry) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${entry.google}&display=swap`;
+  document.head.appendChild(link);
+  loadedFonts.add(fontName);
+}
+
+function populateFontSelect(selectEl, list, current){
+  selectEl.innerHTML = list.map(f =>
+    `<option value="${f.name}" ${f.name === current ? 'selected' : ''}>${f.name}</option>`
+  ).join('');
+}
+
+function applyTheme(data){
+  document.documentElement.style.setProperty('--navy', data.primary_color || '#16213E');
+  document.documentElement.style.setProperty('--amber', data.accent_color || '#E8A33D');
+  document.documentElement.style.setProperty('--bg', data.bg_color || '#F6F7FB');
+  document.documentElement.style.setProperty('--card', data.card_color || '#FFFFFF');
+  document.documentElement.style.setProperty('--text', data.text_color || '#1C2333');
+
+  const headingFont = data.heading_font || 'Sora';
+  const bodyFont = data.body_font || 'Inter';
+  ensureFontLoaded(headingFont, HEADING_FONTS);
+  ensureFontLoaded(bodyFont, BODY_FONTS);
+  document.documentElement.style.setProperty('--font-heading', `'${headingFont}', sans-serif`);
+  document.documentElement.style.setProperty('--font-body', `'${bodyFont}', sans-serif`);
+}
+
+// Live-preview handlers: apply immediately on change, persist only on Save.
+document.getElementById('wsPrimary').oninput = e => document.documentElement.style.setProperty('--navy', e.target.value);
+document.getElementById('wsAccent').oninput = e => document.documentElement.style.setProperty('--amber', e.target.value);
+document.getElementById('wsBg').oninput = e => document.documentElement.style.setProperty('--bg', e.target.value);
+document.getElementById('wsCard').oninput = e => document.documentElement.style.setProperty('--card', e.target.value);
+document.getElementById('wsText').oninput = e => document.documentElement.style.setProperty('--text', e.target.value);
+document.getElementById('wsHeadingFont').onchange = e => {
+  ensureFontLoaded(e.target.value, HEADING_FONTS);
+  document.documentElement.style.setProperty('--font-heading', `'${e.target.value}', sans-serif`);
+};
+document.getElementById('wsBodyFont').onchange = e => {
+  ensureFontLoaded(e.target.value, BODY_FONTS);
+  document.documentElement.style.setProperty('--font-body', `'${e.target.value}', sans-serif`);
+};
+
 /* ---------------- WORKSPACE SETTINGS ---------------- */
 async function loadWorkspaceSettings(){
   const { data } = await sb.from('workspace_settings').select('*').eq('id', 1).single();
@@ -2323,14 +2424,18 @@ async function loadWorkspaceSettings(){
     if(textNode) textNode.textContent = data.workspace_name;
   });
   document.title = data.workspace_name + ' — ' + (data.tagline || 'Team knowledge hub');
-  document.documentElement.style.setProperty('--navy', data.primary_color || '#16213E');
-  document.documentElement.style.setProperty('--amber', data.accent_color || '#E8A33D');
+  applyTheme(data);
 
   // pre-fill settings form
   document.getElementById('wsName').value = data.workspace_name || '';
   document.getElementById('wsTagline').value = data.tagline || '';
   document.getElementById('wsPrimary').value = data.primary_color || '#16213E';
   document.getElementById('wsAccent').value = data.accent_color || '#E8A33D';
+  document.getElementById('wsBg').value = data.bg_color || '#F6F7FB';
+  document.getElementById('wsCard').value = data.card_color || '#FFFFFF';
+  document.getElementById('wsText').value = data.text_color || '#1C2333';
+  populateFontSelect(document.getElementById('wsHeadingFont'), HEADING_FONTS, data.heading_font || 'Sora');
+  populateFontSelect(document.getElementById('wsBodyFont'), BODY_FONTS, data.body_font || 'Inter');
 }
 
 document.getElementById('saveWorkspaceBtn').onclick = async () => {
@@ -2338,7 +2443,12 @@ document.getElementById('saveWorkspaceBtn').onclick = async () => {
     workspace_name: document.getElementById('wsName').value.trim() || 'Cortex',
     tagline: document.getElementById('wsTagline').value.trim(),
     primary_color: document.getElementById('wsPrimary').value,
-    accent_color: document.getElementById('wsAccent').value
+    accent_color: document.getElementById('wsAccent').value,
+    bg_color: document.getElementById('wsBg').value,
+    card_color: document.getElementById('wsCard').value,
+    text_color: document.getElementById('wsText').value,
+    heading_font: document.getElementById('wsHeadingFont').value,
+    body_font: document.getElementById('wsBodyFont').value
   };
   const { error } = await sb.from('workspace_settings').update(payload).eq('id', 1);
   if(!error){
@@ -2346,6 +2456,8 @@ document.getElementById('saveWorkspaceBtn').onclick = async () => {
     const toast = document.getElementById('wsSaveToast');
     toast.style.display = 'inline';
     setTimeout(() => toast.style.display = 'none', 2000);
+  } else {
+    alert('Could not save theme: ' + error.message);
   }
 };
 
