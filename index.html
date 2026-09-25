@@ -1043,6 +1043,7 @@
           <input type="text" id="newMemberDesignation" list="designationSuggestions" placeholder="Designation (optional)">
           <datalist id="designationSuggestions"></datalist>
           <select id="newMemberTechGroup"><option value="">No technician group</option></select>
+          <select id="newMemberReportsTo"><option value="">No reporting manager</option></select>
           <select id="newMemberRole"></select>
           <button id="addMemberBtn">Create user</button>
         </div>
@@ -2499,12 +2500,14 @@ async function loadMembersTab(){
   if(!members || !members.length){ wrap.innerHTML = '<div class="empty-state">No members yet.</div>'; return; }
   const canEditRoles = currentUserRole === 'admin';
   const canEditOrg = ROLE_LEVEL[currentUserRole] >= ROLE_LEVEL.manager;
+  populateReportsToSelect(document.getElementById('newMemberReportsTo'), members, null, null);
   wrap.innerHTML = members.map(m => `
     <div class="member-row">
       <div class="avatar" style="background:${colorFor(m.id)};">${initials(m.full_name)}</div>
       <div class="member-info"><div class="name">${escapeHtml(m.full_name)}${m.id === currentUser.id ? ' (you)' : ''}</div><div class="email">${escapeHtml(m.email || '')}</div></div>
       <input type="text" class="role-select designation-input" data-user="${m.id}" list="designationSuggestions" placeholder="Designation" value="${escapeHtml(m.designation || '')}" style="width:150px;" ${!canEditOrg ? 'disabled' : ''}>
       <select class="role-select tech-group-select" data-user="${m.id}" ${!canEditOrg ? 'disabled' : ''}></select>
+      <select class="role-select reports-to-select" data-user="${m.id}" ${!canEditOrg ? 'disabled' : ''}></select>
       <select class="role-select" data-user="${m.id}" ${(!canEditRoles || m.id === currentUser.id) ? 'disabled' : ''}>
         ${['admin','manager','contributor','viewer'].map(r => `<option value="${r}" ${r===m.role?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
       </select>
@@ -2513,7 +2516,11 @@ async function loadMembersTab(){
     const member = members.find(m => m.id === sel.dataset.user);
     populateTechGroupSelect(sel, member?.technician_group_id);
   });
-  wrap.querySelectorAll('.role-select:not(.designation-input):not(.tech-group-select)').forEach(sel => {
+  wrap.querySelectorAll('.reports-to-select').forEach(sel => {
+    const member = members.find(m => m.id === sel.dataset.user);
+    populateReportsToSelect(sel, members, member?.reports_to, member?.id);
+  });
+  wrap.querySelectorAll('.role-select:not(.designation-input):not(.tech-group-select):not(.reports-to-select)').forEach(sel => {
     sel.onchange = async () => {
       const { error } = await sb.from('profiles').update({ role: sel.value }).eq('id', sel.dataset.user);
       if(error) alert('Could not update role: ' + error.message);
@@ -2527,6 +2534,13 @@ async function loadMembersTab(){
       else showToast('Technician group updated');
     };
   });
+  wrap.querySelectorAll('.reports-to-select').forEach(sel => {
+    sel.onchange = async () => {
+      const { error } = await sb.from('profiles').update({ reports_to: sel.value || null }).eq('id', sel.dataset.user);
+      if(error) alert('Could not update reporting manager: ' + error.message);
+      else showToast('Reporting manager updated');
+    };
+  });
   wrap.querySelectorAll('.designation-input').forEach(inp => {
     inp.onchange = async () => {
       const { error } = await sb.from('profiles').update({ designation: inp.value.trim() || null }).eq('id', inp.dataset.user);
@@ -2534,6 +2548,13 @@ async function loadMembersTab(){
       else showToast('Designation updated');
     };
   });
+}
+
+function populateReportsToSelect(sel, members, selectedId, excludeId){
+  if(!sel) return;
+  const options = (members || []).filter(m => m.id !== excludeId);
+  sel.innerHTML = '<option value="">No reporting manager</option>' + options.map(m => `<option value="${m.id}" ${m.id===selectedId?'selected':''}>${escapeHtml(m.full_name)} (${escapeHtml(m.email||'')})</option>`).join('');
+  if(selectedId) sel.value = selectedId;
 }
 
 document.getElementById('newMemberDesignation').addEventListener('change', () => {
@@ -2551,6 +2572,7 @@ document.getElementById('addMemberBtn').onclick = async () => {
   const role = document.getElementById('newMemberRole').value;
   const designation = document.getElementById('newMemberDesignation').value.trim();
   const technician_group_id = document.getElementById('newMemberTechGroup').value;
+  const reports_to = document.getElementById('newMemberReportsTo').value;
   if(!full_name || !email || !password){ alert('Fill in name, email, and a temporary password.'); return; }
   const btn = document.getElementById('addMemberBtn'); btn.disabled = true; btn.textContent = 'Creating…';
   try{
@@ -2558,14 +2580,15 @@ document.getElementById('addMemberBtn').onclick = async () => {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/create-user`, { method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`}, body:JSON.stringify({email,password,full_name,role}) });
     const result = await res.json();
     if(!res.ok) throw new Error(result.error || 'Failed to create user');
-    if(designation || technician_group_id){
+    if(designation || technician_group_id || reports_to){
       const patch = {};
       if(designation) patch.designation = designation;
       if(technician_group_id) patch.technician_group_id = technician_group_id;
+      if(reports_to) patch.reports_to = reports_to;
       const { error: patchErr } = await sb.from('profiles').update(patch).eq('id', result.user_id);
-      if(patchErr) console.error('Could not set designation/technician group:', patchErr.message);
+      if(patchErr) console.error('Could not set designation/technician group/reports-to:', patchErr.message);
     }
-    document.getElementById('newMemberName').value=''; document.getElementById('newMemberEmail').value=''; document.getElementById('newMemberPassword').value=''; document.getElementById('newMemberDesignation').value=''; document.getElementById('newMemberTechGroup').value='';
+    document.getElementById('newMemberName').value=''; document.getElementById('newMemberEmail').value=''; document.getElementById('newMemberPassword').value=''; document.getElementById('newMemberDesignation').value=''; document.getElementById('newMemberTechGroup').value=''; document.getElementById('newMemberReportsTo').value='';
     await loadMembersTab(); await loadAdminOverview(); showToast('Member created');
   } catch(err){ alert(err.message); } finally { btn.disabled=false; btn.textContent='Create user'; }
 };
