@@ -36,11 +36,6 @@
   body.dark-mode{ background:var(--bg); color:var(--text); }
   body.dark-mode .post-body-rich,
   body.dark-mode .comment-row .c-body{ color:var(--text-mute); }
-  /* Plain <input>/<select> elements don't inherit the theme variables the way divs do --
-     without this they keep the browser's native white background + black text even
-     when the rest of the UI has switched to dark mode (composer dropdowns, poll option
-     fields, admin modal fields, etc). The search bar and the pre-login auth fields are
-     deliberately excluded/reasserted below since they already have their own styling. */
   body.dark-mode select,
   body.dark-mode input[type="text"],
   body.dark-mode input[type="email"],
@@ -59,27 +54,11 @@
     background:rgba(255,255,255,0.08);
     color:#fff;
   }
-  /* Plain checkboxes (broadcast toggle, admin-only toggle, visibility-panel role
-     checkboxes) are native form controls the OS renders with its own light theme --
-     accent-color re-themes the check itself without needing a background hack, and
-     works the same in light mode so this isn't dark-mode-only. */
   input[type="checkbox"]{ accent-color: var(--amber); }
   body.dark-mode .broadcast-badge{
     background: rgba(192,57,43,0.22);
     color: #FF7A6E;
   }
-
-  /* ---------- Dark-mode accent-text fixes ----------
-     Several rules elsewhere in this file use var(--navy) as an "accent" text color
-     (active tab labels, links, read-more, hover states). That works in light mode
-     because navy-on-white is high contrast, but --navy is never redefined for dark
-     mode above, and the two dark-mode surface colors (--bg, --card) are themselves
-     navy-toned -- so navy text on top of them is nearly invisible. Reroute all of
-     those accent-text usages to --amber in dark mode, which is already the hover/
-     active accent everywhere else, so this stays visually consistent rather than
-     introducing a new color. The .url-attachment rule uses !important elsewhere to
-     win over the general link-color rule, so it needs a matching !important override
-     here to actually take effect. */
   body.dark-mode .footer-action:hover,
   body.dark-mode .channel-tab.active,
   body.dark-mode .admin-tab.active,
@@ -137,7 +116,6 @@
   button{font-family:inherit; cursor:pointer;}
   input{font-family:inherit;}
 
-  /* ---------- Auth screen ---------- */
   .auth-screen{
     height:100vh;
     display:flex;
@@ -187,7 +165,6 @@
   }
   .auth-loading{display:none; font-size:12px; color:var(--text-faint); margin-top:10px; text-align:center;}
 
-  /* ---------- Layout shell ---------- */
   .app{
     display:none;
     grid-template-columns: 240px minmax(0,1fr) 300px;
@@ -274,7 +251,6 @@
     font-size:13px; margin-bottom:8px; outline:none;
   }
 
-  /* ---------- Rich text composer ---------- */
   .rte-toolbar{display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap;}
   .rte-btn{
     width:28px; height:28px; border:1px solid var(--line); border-radius:6px;
@@ -296,12 +272,11 @@
   .rte-body p, .rte-body div{margin:0 0 8px 0;}
   .rte-body p:last-child, .rte-body div:last-child{margin-bottom:0;}
 
-  /* ---------- Post body: rich content (shared by composer + rendered posts) ---------- */
   .post-body-rich{font-size:13.5px; color:var(--text-mute); line-height:1.6;}
   .post-body-rich ul, .post-body-rich ol{margin-left:20px;}
   .post-body-rich p, .post-body-rich div{margin:0 0 8px 0;}
   .post-body-rich p:last-child, .post-body-rich div:last-child{margin-bottom:0;}
-  
+
   .post-body-rich h1, .rte-body h1,
   .post-body-rich h2, .rte-body h2,
   .post-body-rich h3, .rte-body h3,
@@ -337,7 +312,6 @@
   .url-attachment:before{content:"🔗"; flex-shrink:0; font-size:12px;}
   .url-attachment:hover{border-color:var(--amber); background:var(--amber-soft);}
 
-  /* ---------- Read more / post truncation ---------- */
   .read-more-btn{
     background:none; border:none; padding:0; margin-top:-2px; margin-bottom:8px;
     font-size:12.5px; font-weight:700; color:var(--navy);
@@ -345,7 +319,6 @@
   }
   .read-more-btn:hover{color:var(--amber);}
 
-  /* ---------- Post footer actions ---------- */
   .post-footer{
     display:flex; align-items:center; gap:6px; flex-wrap:wrap;
     margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
@@ -484,7 +457,6 @@
   ::-webkit-scrollbar-track{background:transparent;}
   @media (prefers-reduced-motion: reduce){.broadcast-badge .pulse{animation:none;}}
 
-  /* ---------- Gear / settings button ---------- */
   .gear-btn{
     width:34px; height:34px; border-radius:8px;
     display:flex; align-items:center; justify-content:center;
@@ -492,13 +464,11 @@
   }
   .gear-btn:hover{background:rgba(255,255,255,0.12);}
 
-  /* ---------- Role gating notices ---------- */
   .view-only-note{
     font-size:12.5px; color:var(--text-faint); padding:10px 4px;
   }
   .locked-input{background:var(--bg); color:var(--text-faint);}
 
-  /* ---------- Admin page ---------- */
   .admin-page{
     display:none; position:fixed; inset:60px 0 0 0; z-index:80;
     background:var(--bg); grid-template-columns:240px minmax(0,1fr);
@@ -573,7 +543,6 @@
     .quick-action-grid{grid-template-columns:1fr;}
   }
 
-  /* ---------- Post detail modal (Read more) ---------- */
   .post-detail-modal{width:680px;}
   .post-detail-modal .admin-tab-content,
   #postDetailBody{padding:20px 22px; overflow-y:auto; flex:1;}
@@ -581,7 +550,6 @@
   #postDetailBody .post::before{display:none;}
   #postDetailBody .post-footer{cursor:default;}
 
-  /* ---------- Toast ---------- */
   .app-toast{
     position:fixed; left:50%; bottom:28px; transform:translate(-50%, 12px);
     background:var(--navy); color:#fff; font-size:12.5px; font-weight:600;
@@ -590,7 +558,6 @@
   }
   .app-toast.visible{opacity:1; transform:translate(-50%, 0);}
 
-  /* ---------- Notifications ---------- */
   .notif-badge{
     position:absolute; top:4px; right:4px; min-width:15px; height:15px; border-radius:8px;
     background:#C0392B; color:#fff; font-size:9.5px; font-weight:700;
@@ -617,7 +584,6 @@
   .notif-item .body{font-size:11.5px; color:var(--text-mute); margin-top:2px; line-height:1.4;}
   .notif-item .time{font-size:10px; color:var(--text-faint); margin-top:5px; font-family:'IBM Plex Mono',monospace;}
 
-  /* ---------- @mentions ---------- */
   .mention-dropdown{
     display:none; position:fixed; z-index:200; background:var(--card); border:1px solid var(--line);
     border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.18); min-width:170px; max-width:240px; overflow:hidden;
@@ -628,7 +594,6 @@
     background:var(--amber-soft); color:#B4740F; padding:1px 5px; border-radius:5px; font-weight:600;
   }
 
-  /* ---------- Profile panel ---------- */
   .profile-panel{
     display:none; position:fixed; top:56px; right:24px; width:260px;
     background:var(--card); border:1px solid var(--line); border-radius:12px;
@@ -655,7 +620,6 @@
   .switch input:checked + .switch-slider{background:var(--amber);}
   .switch input:checked + .switch-slider:before{transform:translateX(16px);}
 
-  /* ---------- Comment threads / replies / likes ---------- */
   .comment-thread{margin-left:32px; margin-top:8px; display:flex; flex-direction:column; gap:10px;}
   .comment-actions-row{display:flex; gap:12px; margin-top:4px;}
   .comment-mini-btn{background:none; border:none; font-size:11px; color:var(--text-faint); cursor:pointer; padding:0;}
@@ -664,7 +628,6 @@
   .comment-mini-btn.delete-comment-btn:hover{color:#C0392B;}
   .comment-reply-input-row{display:flex; gap:6px; margin-top:8px;}
 
-  /* ---------- Modal overlay system (Liked by, Post detail) ---------- */
   .modal-overlay{
     display:none; position:fixed; inset:0; z-index:150;
     background:rgba(10,14,26,0.55);
@@ -687,7 +650,6 @@
   }
   .close-modal-btn:hover{color:var(--text); background:var(--bg);}
 
-  /* ---------- Member rows (Liked by list, Members admin list) ---------- */
   .member-row{
     display:flex; align-items:center; gap:10px; padding:10px 0;
     border-bottom:1px solid var(--line);
@@ -697,7 +659,6 @@
   .member-info .name{font-size:13px; font-weight:600; color:var(--text);}
   .member-info .email{font-size:11.5px; color:var(--text-faint); margin-top:1px;}
 
-  /* ---------- Create-form (Add member, Add space/channel) ---------- */
   .create-form{
     display:flex; flex-wrap:wrap; gap:8px; align-items:center;
   }
@@ -716,7 +677,6 @@
   .create-form button:hover{background:var(--navy-soft);}
   .create-form button:disabled{opacity:0.6; cursor:default;}
 
-  /* ---------- Workspace settings fields ---------- */
   .settings-field{margin-bottom:16px;}
   .settings-field label{
     display:block; font-size:12px; font-weight:600; color:var(--text-mute); margin-bottom:6px;
@@ -747,7 +707,6 @@
     display:none; margin-left:12px; font-size:12px; font-weight:600; color:var(--green);
   }
 
-  /* ---------- Spaces/Channels manage rows ---------- */
   .manage-row{
     display:flex; align-items:center; gap:10px; padding:13px 0;
     border-bottom:1px solid var(--line); flex-wrap:wrap;
@@ -785,7 +744,6 @@
   .role-select:focus{border-color:var(--amber);}
   .role-select:disabled{opacity:0.6; cursor:default;}
 
-  /* ---------- Visibility / access panels (dynamically inserted) ---------- */
   .access-panel{
     width:100%; margin:8px 0 4px; padding:13px 14px;
     background:var(--bg); border:1px solid var(--line); border-radius:9px;
@@ -801,7 +759,6 @@
     margin-top:6px; padding-top:10px; border-top:1px solid var(--line);
   }
 
-  /* ---------- Dark-mode touch-ups for the above ---------- */
   body.dark-mode .admin-modal{box-shadow:0 24px 60px rgba(0,0,0,0.6);}
   body.dark-mode .create-form button,
   body.dark-mode .save-settings-btn{background:var(--amber); color:#1A1A1A;}
@@ -810,7 +767,6 @@
   body.dark-mode .access-btn:hover{border-color:var(--amber); color:var(--amber);}
   body.dark-mode .delete-btn:hover{background:rgba(192,57,43,0.18);}
 
-  /* ---------- Dark-mode: footer action hover backgrounds ---------- */
   body.dark-mode .footer-action.like-btn:hover{background:rgba(192,57,43,0.15);}
   body.dark-mode .footer-action.like-btn.liked:hover{background:rgba(192,57,43,0.2);}
   body.dark-mode .footer-action.comment-toggle-btn:hover{background:rgba(52,87,213,0.12);}
@@ -820,10 +776,8 @@
   body.dark-mode .footer-action.delete-post-btn:hover{background:rgba(192,57,43,0.15);}
   body.dark-mode .footer-action:hover{background:rgba(255,255,255,0.06);}
 
-  /* ---------- Dark-mode: scrollbar ---------- */
   body.dark-mode ::-webkit-scrollbar-thumb{background:#3A4058;}
 
-  /* ---------- Dark-mode: editable fields (comment/reply/chat inputs) ---------- */
   body.dark-mode .editable-field{
     background:var(--bg);
     color:var(--text);
@@ -833,7 +787,6 @@
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
 <div class="auth-screen" id="authScreen">
   <div class="auth-card">
     <div class="auth-brand"><div class="mark">C</div>Cortex</div>
@@ -858,7 +811,6 @@
   </div>
 </div>
 
-<!-- MAIN APP -->
 <div class="app" id="app">
 
   <div class="topbar">
@@ -971,7 +923,6 @@
 
 </div>
 
-<!-- NOTIFICATIONS PANEL -->
 <div class="notif-panel" id="notifPanel">
   <div class="notif-panel-head">
     <h3>Notifications</h3>
@@ -980,7 +931,6 @@
   <div class="notif-list" id="notifList"><div class="empty-state">Loading…</div></div>
 </div>
 
-<!-- LIKED BY MODAL -->
 <div class="modal-overlay" id="likesModalOverlay">
   <div class="admin-modal" style="width:320px;">
     <div class="admin-modal-head">
@@ -991,7 +941,6 @@
   </div>
 </div>
 
-<!-- POST DETAIL MODAL (Read more / full post view) -->
 <div class="modal-overlay" id="postDetailModalOverlay">
   <div class="admin-modal post-detail-modal">
     <div class="admin-modal-head">
@@ -1005,7 +954,6 @@
   </div>
 </div>
 
-<!-- PROFILE PANEL -->
 <div class="profile-panel" id="profilePanel">
   <div class="profile-panel-head">
     <div class="avatar" id="profilePanelAvatar" style="width:38px;height:38px;font-size:14px;">?</div>
@@ -1024,7 +972,6 @@
   </div>
 </div>
 
-<!-- ADMIN PAGE -->
 <div class="admin-page" id="adminPage" aria-hidden="true">
   <div class="admin-page-sidebar">
     <div class="admin-page-brand">
@@ -1199,7 +1146,6 @@ let channels = [];
 let activeChannelId = null;
 let isSignUpMode = false;
 
-/* ---------------- AUTH ---------------- */
 const authError = document.getElementById('authError');
 const authLoading = document.getElementById('authLoading');
 const authSubmitBtn = document.getElementById('authSubmitBtn');
@@ -1267,14 +1213,12 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-/* ---------------- BOOT ---------------- */
 async function boot(){
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
 
   let { data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
   if(!profile){
-    // fallback in case trigger hasn't fired yet
     await sb.from('profiles').insert({ id: currentUser.id, full_name: currentUser.email.split('@')[0], email: currentUser.email });
     ({ data: profile } = await sb.from('profiles').select('*').eq('id', currentUser.id).single());
   }
@@ -1306,7 +1250,6 @@ async function boot(){
   openPostFromHash();
 }
 
-/* ---------------- PROFILE PANEL ---------------- */
 document.getElementById('myAvatar').onclick = (e) => {
   e.stopPropagation();
   document.getElementById('profilePanel').classList.toggle('visible');
@@ -1327,7 +1270,6 @@ document.getElementById('allowTaggingToggle').onchange = async (e) => {
   await sb.from('profiles').update({ allow_tagging: e.target.checked }).eq('id', currentUser.id);
 };
 
-/* ---------------- NOTIFICATIONS ---------------- */
 async function loadNotifications(){
   const { data } = await sb.from('notifications').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(30);
   renderNotifications(data || []);
@@ -1381,31 +1323,26 @@ document.addEventListener('click', (e) => {
   }
 });
 
-/* ---------------- ROLE GATING ---------------- */
 function applyRoleGating(){
   const level = ROLE_LEVEL[currentUserRole] || 1;
 
-  // Admin/Manager gear -- Managers can manage members/spaces/channels; Admins also get workspace settings
   document.getElementById('adminGearBtn').style.display = level >= ROLE_LEVEL.manager ? 'flex' : 'none';
   const workspaceNav = document.getElementById('workspaceAdminNav');
   if(workspaceNav) workspaceNav.style.display = currentUserRole === 'admin' ? 'flex' : 'none';
   const rolePill = document.getElementById('adminRolePill');
   if(rolePill) rolePill.textContent = currentUserRole;
-  
 
-  // Composer: contributor+ can post
+
   const composer = document.querySelector('.composer');
   if(level < ROLE_LEVEL.contributor){
     composer.innerHTML = '<div class="view-only-note">You have view-only access. Reach out to your admin if you need to post.</div>';
   }
 
-  // Broadcast checkbox: manager+ only
   const broadcastToggle = document.querySelector('.broadcast-toggle');
   if(level < ROLE_LEVEL.manager){
     broadcastToggle.style.display = 'none';
   }
 
-  // Chat input: contributor+ only
   const chatInput = document.getElementById('chatInput');
   const chatSendBtn = document.getElementById('chatSendBtn');
   if(level < ROLE_LEVEL.contributor){
@@ -1417,7 +1354,6 @@ function applyRoleGating(){
   }
 }
 
-/* ---------------- PROFILES CACHE ---------------- */
 async function getProfile(id){
   if(profilesCache[id]) return profilesCache[id];
   const { data } = await sb.from('profiles').select('*').eq('id', id).single();
@@ -1427,7 +1363,6 @@ async function getProfile(id){
 
 let activeSpaceId = null;
 
-/* ---------------- SPACES ---------------- */
 async function loadSpaces(){
   const { data } = await sb.from('spaces').select('*').order('name');
   spaces = data || [];
@@ -1461,7 +1396,6 @@ function selectSpace(spaceId){
   loadFeed();
 }
 
-/* ---------------- CHANNELS + CHAT ---------------- */
 async function loadChannels(){
   const { data } = await sb.from('channels').select('*').order('name');
   channels = data || [];
@@ -1533,7 +1467,6 @@ async function sendMessage(){
   });
 }
 
-/* ---------------- FEED ---------------- */
 document.getElementById('pollToggleBtn').onclick = () => {
   const extra = document.getElementById('composerExtra');
   const pollWrap = document.getElementById('pollOptionsWrap');
@@ -1562,9 +1495,6 @@ document.querySelectorAll('.rte-btn[data-cmd]').forEach(btn => {
   };
 });
 
-/* Plain contenteditable Enter behavior is inconsistent across browsers -- Enter and
-   Shift+Enter can end up looking identical. Force it explicitly: Enter makes a real new
-   paragraph (<p>, spaced via CSS above), Shift+Enter makes a soft line break within one. */
 const postBodyRTE = document.getElementById('postBodyRTE');
 document.execCommand('defaultParagraphSeparator', false, 'p');
 postBodyRTE.addEventListener('focus', () => {
@@ -1575,13 +1505,8 @@ postBodyRTE.addEventListener('keydown', (e) => {
     e.preventDefault();
     document.execCommand('insertLineBreak');
   }
-  // plain Enter falls through to the browser default, which now produces <p> tags
 });
 
-/* ---------------- @MENTIONS ----------------
-   Lazy-loaded by design: nothing is fetched until someone actually types "@".
-   attachMentionSupport(target) works on any contenteditable element -- the post
-   body, chat input, and every comment box all share this one implementation. */
 const mentionDropdown = document.createElement('div');
 mentionDropdown.className = 'mention-dropdown';
 document.body.appendChild(mentionDropdown);
@@ -1629,7 +1554,7 @@ function insertMention(target, m, userId, fullName){
 
   const parent = textNode.parentNode;
   const beforeNode = document.createTextNode(before);
-  const afterNode = document.createTextNode('\u00A0' + after);
+  const afterNode = document.createTextNode(' ' + after);
   parent.replaceChild(afterNode, textNode);
   parent.insertBefore(mentionSpan, afterNode);
   parent.insertBefore(beforeNode, mentionSpan);
@@ -1653,7 +1578,6 @@ function attachMentionSupport(target){
     clearTimeout(mentionSearchTimer);
     mentionSearchTimer = setTimeout(async () => {
       const matches = await searchMentionCandidates(m.query);
-      // re-check the query is still current before showing results (user may have kept typing)
       const stillActive = findMentionQuery(target);
       if(!matches.length || !stillActive || stillActive.query !== m.query){ hideMentionDropdown(); return; }
 
@@ -1682,8 +1606,6 @@ document.addEventListener('mousedown', (e) => {
 attachMentionSupport(postBodyRTE);
 attachMentionSupport(document.getElementById('chatInput'));
 
-/* Save a cursor position before an async gap (file upload, a browser prompt() dialog) --
-   focus/selection can be lost during that gap, so we restore it before inserting. */
 function saveCaret(target){
   const sel = window.getSelection();
   if(sel.rangeCount && target.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
@@ -1778,14 +1700,6 @@ document.getElementById('urlAttachBtn').onclick = (e) => {
   postBodyRTE.focus();
 };
 
-/* Minimal allowlist HTML sanitizer -- used both before saving and before every render,
-   so it protects viewers even if a post reached the table via a route other than this UI.
-   Attributes only ever survive in four hand-validated cases: a text-align value on P/DIV,
-   a mention chip's data-user checked against a strict UUID shape, an IMG src checked against
-   our own storage bucket's URL prefix (so this can't be used to load a third-party tracking
-   pixel), and an A href checked to start with http(s) (so javascript:/data: URLs are rejected).
-   We never copy the original attribute string in any of these cases, only a value we've
-   validated ourselves, and target/rel on links are always set fresh, never taken from input. */
 function sanitizeRichText(html){
   const allowed = ['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','SPAN','A','IMG','H1','H2','H3','H4','H5','H6'];
   const allowedAlign = ['left','center','right','justify'];
@@ -1802,11 +1716,16 @@ function sanitizeRichText(html){
         } else if(child.tagName === 'IMG'){
           const src = child.getAttribute('src') || '';
           while(child.attributes.length > 0) child.removeAttribute(child.attributes[0].name);
-          if(src.startsWith(ownImagePrefix) || /^https?:\/\//i.test(src) || src.startsWith('data:image/')){
+          // data: URIs were previously allowed here -- dropped deliberately: they let
+          // an arbitrarily large image be inlined straight into a text column with no
+          // size cap, which is a storage/DoS concern independent of XSS. Real images
+          // now always go through the Storage upload flow (imageFileInput handler),
+          // which is the only path that produces an ownImagePrefix URL.
+          if(src.startsWith(ownImagePrefix) || /^https?:\/\//i.test(src)){
             child.setAttribute('src', src);
             child.setAttribute('alt', '');
           } else {
-            node.removeChild(child); // drop it if it's not a valid web image
+            node.removeChild(child);
           }
         } else if(child.tagName === 'A'){
           const href = child.getAttribute('href') || '';
@@ -1838,7 +1757,7 @@ function sanitizeRichText(html){
           if(isMention){
             child.setAttribute('class', 'mention');
             child.setAttribute('data-user', mentionUserId);
-            child.textContent = mentionText; // re-set so no nested markup can hide inside the chip
+            child.textContent = mentionText;
           } else {
             clean(child);
           }
@@ -1873,6 +1792,11 @@ function sanitizeRichText(html){
   })(template.content);
   return template.innerHTML;
 }
+
+/* @mention notifications are handled entirely server-side (notify_post_mentions,
+   notify_comment_mentions, notify_message_mentions triggers), which parse
+   data-user="<uuid>" out of the inserted row's body directly -- no client-side
+   RPC call is needed. */
 
 document.getElementById('postSubmitBtn').onclick = async () => {
   const title = document.getElementById('postTitleInput').value.trim();
@@ -1935,7 +1859,7 @@ async function renderFeed(entries){
 async function renderPost(post, repostedBy, opts={}){
   const truncate = opts.truncate !== false;
   const modal = !!opts.modal;
-  postsRawCache[post.id] = post; // cache raw row so Read more / Share can find it without a refetch
+  postsRawCache[post.id] = post;
 
   const author = await getProfile(post.author_id);
   const space = spaces.find(s => s.id === post.space_id);
@@ -1976,9 +1900,6 @@ async function renderPost(post, repostedBy, opts={}){
     }).join('') + `<div class="poll-total">${total} vote${total!==1?'s':''}</div>`;
   }
 
-  // Body: sanitized rich HTML is always what's stored/trusted. For long posts (>200 words)
-  // in feed context we show a plain-text preview + "Read more" instead of truncating markup
-  // mid-tag. The modal (opts.truncate=false) always gets the full rich body.
   let bodyBlock = '';
   if(post.body){
     const sanitized = sanitizeRichText(post.body);
@@ -2035,7 +1956,6 @@ async function renderPost(post, repostedBy, opts={}){
 
 function htmlToPlainText(html){
   const d = document.createElement('div');
-  // Ensure spacing between block elements and breaks before extracting text
   d.innerHTML = (html || '').replace(/<\/(p|div|h[1-6]|li)>/ig, ' </$1>').replace(/<br\s*\/?>/ig, ' ');
   return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
@@ -2088,7 +2008,6 @@ function attachPostActionHandlers(){
   });
 }
 
-/* ---------------- SHARE ---------------- */
 function showToast(msg){
   let t = document.getElementById('appToast');
   if(!t){
@@ -2119,7 +2038,7 @@ async function sharePost(postId){
     await navigator.clipboard.writeText(url);
     showToast('Link copied to clipboard');
   } catch(err){
-    if(err && err.name === 'AbortError') return; // user cancelled the native share sheet
+    if(err && err.name === 'AbortError') return;
     try{
       await navigator.clipboard.writeText(url);
       showToast('Link copied to clipboard');
@@ -2129,7 +2048,6 @@ async function sharePost(postId){
   }
 }
 
-/* ---------------- POST DETAIL MODAL (Read more) ---------------- */
 let postsRawCache = {};
 
 async function openPostModal(postId){
@@ -2194,7 +2112,6 @@ document.getElementById('likesModalOverlay').onclick = (e) => {
   if(e.target.id === 'likesModalOverlay') e.currentTarget.classList.remove('visible');
 };
 
-/* ---------------- COMMENTS: threads, likes, replies, delete ---------------- */
 async function toggleComments(postId){
   const section = document.getElementById('comments-' + postId);
   if(section.style.display === 'block'){ section.style.display = 'none'; return; }
@@ -2325,14 +2242,13 @@ function attachPollHandlers(){
   document.querySelectorAll('.poll-option').forEach(el => {
     el.onclick = async () => {
       const optionId = el.dataset.option;
-      // remove any existing vote by this user among sibling options, then cast new
       const postCard = el.closest('.post');
       const sameOptionEls = postCard.querySelectorAll('.poll-option');
       const optionIds = Array.from(sameOptionEls).map(o => o.dataset.option);
       const { data: existing } = await sb.from('poll_votes').select('*').eq('user_id', currentUser.id).in('option_id', optionIds);
       if(existing && existing.length){
         await sb.from('poll_votes').delete().eq('id', existing[0].id);
-        if(existing[0].option_id === optionId){ await loadFeed(); return; } // toggled off
+        if(existing[0].option_id === optionId){ await loadFeed(); return; }
       }
       await sb.from('poll_votes').insert({ option_id: optionId, user_id: currentUser.id });
       await loadFeed();
@@ -2340,12 +2256,6 @@ function attachPollHandlers(){
   });
 }
 
-/* ---------------- WORKSPACE SETTINGS: theme (colors + fonts) ---------------- */
-/* Curated Google Fonts lists -- kept short and legible-at-a-glance rather than
-   exhaustive. Sora/Inter are already preloaded via the <link> tag in <head>, so
-   they're marked pre-loaded and never re-fetched. Anything else is lazy-loaded
-   the first time it's actually selected (either from saved settings or by the
-   admin trying it in the picker), via ensureFontLoaded below. */
 const HEADING_FONTS = [
   { name:'Sora', google:'Sora:wght@400;600;700;800' },
   { name:'Poppins', google:'Poppins:wght@400;600;700;800' },
@@ -2366,7 +2276,7 @@ const BODY_FONTS = [
   { name:'IBM Plex Sans', google:'IBM+Plex+Sans:wght@400;500;600' },
   { name:'Manrope', google:'Manrope:wght@400;500;600' }
 ];
-const loadedFonts = new Set(['Sora', 'Inter']); // already in the <head> <link>
+const loadedFonts = new Set(['Sora', 'Inter']);
 
 function ensureFontLoaded(fontName, list){
   if(loadedFonts.has(fontName)) return;
@@ -2400,7 +2310,6 @@ function applyTheme(data){
   document.documentElement.style.setProperty('--font-body', `'${bodyFont}', sans-serif`);
 }
 
-// Live-preview handlers: apply immediately on change, persist only on Save.
 document.getElementById('wsPrimary').oninput = e => document.documentElement.style.setProperty('--navy', e.target.value);
 document.getElementById('wsAccent').oninput = e => document.documentElement.style.setProperty('--amber', e.target.value);
 document.getElementById('wsBg').oninput = e => document.documentElement.style.setProperty('--bg', e.target.value);
@@ -2415,7 +2324,6 @@ document.getElementById('wsBodyFont').onchange = e => {
   document.documentElement.style.setProperty('--font-body', `'${e.target.value}', sans-serif`);
 };
 
-/* ---------------- WORKSPACE SETTINGS ---------------- */
 async function loadWorkspaceSettings(){
   const { data } = await sb.from('workspace_settings').select('*').eq('id', 1).single();
   if(!data) return;
@@ -2426,7 +2334,6 @@ async function loadWorkspaceSettings(){
   document.title = data.workspace_name + ' — ' + (data.tagline || 'Team knowledge hub');
   applyTheme(data);
 
-  // pre-fill settings form
   document.getElementById('wsName').value = data.workspace_name || '';
   document.getElementById('wsTagline').value = data.tagline || '';
   document.getElementById('wsPrimary').value = data.primary_color || '#16213E';
@@ -2461,7 +2368,6 @@ document.getElementById('saveWorkspaceBtn').onclick = async () => {
   }
 };
 
-/* ---------------- ADMIN PAGE ---------------- */
 const adminPage = document.getElementById('adminPage');
 const adminSectionMeta = {
   overview: { title:'Admin overview', subtitle:'Manage members, access, spaces, channels, and workspace settings.', crumb:'Overview' },
@@ -2638,7 +2544,6 @@ async function toggleAccessPanel(type,id,row){
 document.getElementById('createSpaceBtn').onclick=async()=>{const name=document.getElementById('newSpaceName').value.trim();if(!name)return;const{error}=await sb.from('spaces').insert({name,color:document.getElementById('newSpaceColor').value,default_min_role:document.getElementById('newSpaceRole').value,created_by:currentUser.id});if(error){alert(error.message);return;}document.getElementById('newSpaceName').value='';await loadSpacesManageTab();await loadSpaces();await loadAdminOverview();showToast('Space created');};
 document.getElementById('createChannelBtn').onclick=async()=>{const name=document.getElementById('newChannelName').value.trim();if(!name)return;const{error}=await sb.from('channels').insert({name,default_min_role:document.getElementById('newChannelRole').value});if(error){alert(error.message);return;}document.getElementById('newChannelName').value='';await loadSpacesManageTab();await loadChannels();await loadAdminOverview();showToast('Channel created');};
 
-/* ---------------- REALTIME ---------------- */
 function subscribeRealtime(){
   sb.channel('public:messages')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -2665,14 +2570,12 @@ function subscribeRealtime(){
     .subscribe();
 }
 
-/* ---------------- UTIL ---------------- */
 function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
 }
 
-/* ---------------- SESSION CHECK ON LOAD ---------------- */
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if(session && session.user){
